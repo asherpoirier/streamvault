@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/App";
 import { Input } from "@/components/ui/input";
@@ -17,13 +17,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // Redirect if already logged in
-  if (user) {
-    if (user.is_admin) {
-      navigate("/admin", { replace: true });
-    } else {
-      navigate("/", { replace: true });
+  useEffect(() => {
+    if (user) {
+      if (user.is_admin) {
+        navigate("/admin", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
     }
-  }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
