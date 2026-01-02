@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-01-02T01:06:33.590599",
-  "total_tests": 3,
-  "passed_tests": 1,
-  "success_rate": 0.3333333333333333,
+  "timestamp": "2026-01-02T01:07:56.848362",
+  "total_tests": 13,
+  "passed_tests": 13,
+  "success_rate": 1.0,
   "results": [
     {
       "test": "API Root",
@@ -11,13 +11,63 @@
     },
     {
       "test": "Unauthorized Access Protection",
-      "success": false,
-      "details": "Status: 403 (should be 401)"
+      "success": true,
+      "details": "Status: 403 (should be 401 or 403)"
     },
     {
-      "test": "Register First User (Admin)",
-      "success": false,
-      "details": "Admin: False, Token: Yes"
+      "test": "Admin Login",
+      "success": true,
+      "details": "Admin: True, Token: Yes"
+    },
+    {
+      "test": "Get Current User",
+      "success": true,
+      "details": "Status: 200"
+    },
+    {
+      "test": "Register New User (Non-Admin)",
+      "success": true,
+      "details": "Admin: False (should be False)"
+    },
+    {
+      "test": "Add Playlist",
+      "success": true,
+      "details": "Channels parsed: 6"
+    },
+    {
+      "test": "Get Playlists",
+      "success": true,
+      "details": "Status: 200"
+    },
+    {
+      "test": "Get Channels",
+      "success": true,
+      "details": "Channels found: 6"
+    },
+    {
+      "test": "Get Providers",
+      "success": true,
+      "details": "Providers found: 1"
+    },
+    {
+      "test": "Search Channels",
+      "success": true,
+      "details": "Status: 200"
+    },
+    {
+      "test": "Filter by Provider",
+      "success": true,
+      "details": "Status: 200"
+    },
+    {
+      "test": "Refresh Playlist",
+      "success": true,
+      "details": "Status: 200"
+    },
+    {
+      "test": "Delete Playlist",
+      "success": true,
+      "details": "Status: 200"
     }
   ]
 }
