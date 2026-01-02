@@ -25,7 +25,11 @@ export const useAuth = () => {
 };
 
 const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // Try to restore user from localStorage on initial load
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
 
@@ -37,8 +41,10 @@ const AuthProvider = ({ children }) => {
             headers: { Authorization: `Bearer ${token}` },
           });
           setUser(response.data);
+          localStorage.setItem("user", JSON.stringify(response.data));
         } catch (error) {
           localStorage.removeItem("token");
+          localStorage.removeItem("user");
           setToken(null);
           setUser(null);
         }
@@ -55,6 +61,7 @@ const AuthProvider = ({ children }) => {
     });
     const { access_token, user: userData } = response.data;
     localStorage.setItem("token", access_token);
+    localStorage.setItem("user", JSON.stringify(userData));
     setToken(access_token);
     setUser(userData);
     return userData;
@@ -67,6 +74,7 @@ const AuthProvider = ({ children }) => {
     });
     const { access_token, user: userData } = response.data;
     localStorage.setItem("token", access_token);
+    localStorage.setItem("user", JSON.stringify(userData));
     setToken(access_token);
     setUser(userData);
     return userData;
@@ -74,6 +82,7 @@ const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setToken(null);
     setUser(null);
   };

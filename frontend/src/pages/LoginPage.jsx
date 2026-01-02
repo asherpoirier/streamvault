@@ -18,7 +18,11 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   if (user) {
-    navigate(user.is_admin ? "/admin" : "/");
+    if (user.is_admin) {
+      navigate("/admin", { replace: true });
+    } else {
+      navigate("/", { replace: true });
+    }
   }
 
   const handleSubmit = async (e) => {
