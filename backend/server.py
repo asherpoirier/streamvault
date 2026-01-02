@@ -1,15 +1,19 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import re
+import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+import jwt
+from passlib.context import CryptContext
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,52 +23,337 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
+# JWT Configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'streamvault-secret-key-change-in-production')
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Security
+security = HTTPBearer()
+
+# Create the main app
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# ============ Models ============
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    username: str
+    is_admin: bool
+    created_at: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+class Channel(BaseModel):
+    name: str
+    url: str
+    logo: Optional[str] = None
+    group: Optional[str] = None
+
+class PlaylistCreate(BaseModel):
+    provider_name: str
+    m3u8_url: str
+
+class PlaylistResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    provider_name: str
+    m3u8_url: str
+    channels: List[Channel]
+    channel_count: int
+    created_at: str
+    updated_at: str
+
+class ChannelWithProvider(BaseModel):
+    name: str
+    url: str
+    logo: Optional[str] = None
+    group: Optional[str] = None
+    provider_name: str
+    playlist_id: str
+
+# ============ Utilities ============
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_access_token(user_id: str, username: str, is_admin: bool) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    payload = {
+        "sub": user_id,
+        "username": username,
+        "is_admin": is_admin,
+        "exp": expire
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_admin_user(current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+def parse_m3u8(content: str) -> List[Channel]:
+    """Parse M3U8 content and extract channels"""
+    channels = []
+    lines = content.strip().split('\n')
     
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    current_channel = {}
+    
+    for line in lines:
+        line = line.strip()
+        
+        if line.startswith('#EXTINF:'):
+            # Parse channel info
+            # Format: #EXTINF:-1 tvg-id="..." tvg-name="..." tvg-logo="..." group-title="...",Channel Name
+            current_channel = {}
+            
+            # Extract logo
+            logo_match = re.search(r'tvg-logo="([^"]*)"', line)
+            if logo_match:
+                current_channel['logo'] = logo_match.group(1)
+            
+            # Extract group
+            group_match = re.search(r'group-title="([^"]*)"', line)
+            if group_match:
+                current_channel['group'] = group_match.group(1)
+            
+            # Extract name (after the comma)
+            name_match = re.search(r',(.+)$', line)
+            if name_match:
+                current_channel['name'] = name_match.group(1).strip()
+                
+        elif line and not line.startswith('#') and current_channel.get('name'):
+            # This is the URL line
+            current_channel['url'] = line
+            channels.append(Channel(**current_channel))
+            current_channel = {}
+    
+    return channels
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+async def fetch_and_parse_m3u8(url: str) -> List[Channel]:
+    """Fetch M3U8 from URL and parse it"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return parse_m3u8(response.text)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch M3U8: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse M3U8: {str(e)}")
 
-# Add your routes to the router instead of directly to app
+# ============ Auth Routes ============
+
+@api_router.post("/auth/register", response_model=TokenResponse)
+async def register(user_data: UserCreate):
+    # Check if user exists
+    existing_user = await db.users.find_one({"username": user_data.username})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Check if this is the first user (make them admin)
+    user_count = await db.users.count_documents({})
+    is_admin = user_count == 0
+    
+    # Create user
+    user_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    
+    user_doc = {
+        "id": user_id,
+        "username": user_data.username,
+        "password_hash": hash_password(user_data.password),
+        "is_admin": is_admin,
+        "created_at": now
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    token = create_access_token(user_id, user_data.username, is_admin)
+    
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(
+            id=user_id,
+            username=user_data.username,
+            is_admin=is_admin,
+            created_at=now
+        )
+    )
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(user_data: UserLogin):
+    user = await db.users.find_one({"username": user_data.username}, {"_id": 0})
+    
+    if not user or not verify_password(user_data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token = create_access_token(user["id"], user["username"], user["is_admin"])
+    
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(
+            id=user["id"],
+            username=user["username"],
+            is_admin=user["is_admin"],
+            created_at=user["created_at"]
+        )
+    )
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    user = await db.users.find_one({"id": current_user["sub"]}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse(**user)
+
+# ============ Playlist Routes (Admin) ============
+
+@api_router.post("/playlists", response_model=PlaylistResponse)
+async def create_playlist(playlist_data: PlaylistCreate, admin: dict = Depends(get_admin_user)):
+    # Check if provider already exists
+    existing = await db.playlists.find_one({"provider_name": playlist_data.provider_name})
+    if existing:
+        raise HTTPException(status_code=400, detail="Provider with this name already exists")
+    
+    # Fetch and parse M3U8
+    channels = await fetch_and_parse_m3u8(playlist_data.m3u8_url)
+    
+    playlist_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    
+    playlist_doc = {
+        "id": playlist_id,
+        "provider_name": playlist_data.provider_name,
+        "m3u8_url": playlist_data.m3u8_url,
+        "channels": [ch.model_dump() for ch in channels],
+        "channel_count": len(channels),
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.playlists.insert_one(playlist_doc)
+    
+    return PlaylistResponse(**playlist_doc)
+
+@api_router.get("/playlists", response_model=List[PlaylistResponse])
+async def get_playlists(admin: dict = Depends(get_admin_user)):
+    playlists = await db.playlists.find({}, {"_id": 0}).to_list(100)
+    return [PlaylistResponse(**p) for p in playlists]
+
+@api_router.get("/playlists/{playlist_id}", response_model=PlaylistResponse)
+async def get_playlist(playlist_id: str, admin: dict = Depends(get_admin_user)):
+    playlist = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    return PlaylistResponse(**playlist)
+
+@api_router.put("/playlists/{playlist_id}/refresh", response_model=PlaylistResponse)
+async def refresh_playlist(playlist_id: str, admin: dict = Depends(get_admin_user)):
+    playlist = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Re-fetch and parse M3U8
+    channels = await fetch_and_parse_m3u8(playlist["m3u8_url"])
+    now = datetime.now(timezone.utc).isoformat()
+    
+    await db.playlists.update_one(
+        {"id": playlist_id},
+        {"$set": {
+            "channels": [ch.model_dump() for ch in channels],
+            "channel_count": len(channels),
+            "updated_at": now
+        }}
+    )
+    
+    updated_playlist = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+    return PlaylistResponse(**updated_playlist)
+
+@api_router.delete("/playlists/{playlist_id}")
+async def delete_playlist(playlist_id: str, admin: dict = Depends(get_admin_user)):
+    result = await db.playlists.delete_one({"id": playlist_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    return {"message": "Playlist deleted"}
+
+# ============ Public Routes ============
+
+@api_router.get("/channels", response_model=List[ChannelWithProvider])
+async def get_all_channels(search: Optional[str] = None, provider: Optional[str] = None):
+    """Get all channels from all playlists, optionally filtered"""
+    playlists = await db.playlists.find({}, {"_id": 0}).to_list(100)
+    
+    all_channels = []
+    for playlist in playlists:
+        # Filter by provider if specified
+        if provider and playlist["provider_name"].lower() != provider.lower():
+            continue
+            
+        for channel in playlist["channels"]:
+            channel_data = ChannelWithProvider(
+                name=channel["name"],
+                url=channel["url"],
+                logo=channel.get("logo"),
+                group=channel.get("group"),
+                provider_name=playlist["provider_name"],
+                playlist_id=playlist["id"]
+            )
+            
+            # Filter by search term
+            if search:
+                search_lower = search.lower()
+                if (search_lower not in channel["name"].lower() and 
+                    search_lower not in (channel.get("group") or "").lower()):
+                    continue
+            
+            all_channels.append(channel_data)
+    
+    return all_channels
+
+@api_router.get("/providers")
+async def get_providers():
+    """Get list of all providers with channel counts"""
+    playlists = await db.playlists.find({}, {"_id": 0, "channels": 0}).to_list(100)
+    return [{"name": p["provider_name"], "channel_count": p["channel_count"], "id": p["id"]} for p in playlists]
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+    return {"message": "StreamVault API"}
 
 # Include the router in the main app
 app.include_router(api_router)
