@@ -1,0 +1,199 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "StreamVault",
+      "metaphor": "Mission Control for Media",
+      "vibe": "Cinematic, High-Voltage, Deep Space",
+      "archetype": "Electric & Neon",
+      "principles": [
+        "Fusion: Streaming Utility x Cyberpunk Dashboard",
+        "Emotion: Anticipation (The feeling before a movie starts)",
+        "Density: High information density, low visual clutter",
+        "Depth: Layers of glass and light, not flat surfaces"
+      ]
+    },
+    "typography": {
+      "fonts": {
+        "headings": {
+          "family": "Clash Display, sans-serif",
+          "weights": ["500", "600", "700"],
+          "usage": "All section headers, hero titles, modal titles. Use tracking-tight."
+        },
+        "body": {
+          "family": "DM Sans, sans-serif",
+          "weights": ["400", "500"],
+          "usage": "General text, channel names, metadata."
+        },
+        "mono": {
+          "family": "JetBrains Mono, monospace",
+          "weights": ["400"],
+          "usage": "Stream URLs, technical metadata, error codes."
+        }
+      },
+      "installation": "Import fonts via Google Fonts in index.css: @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;500;700&family=JetBrains+Mono&display=swap');"
+    },
+    "colors": {
+      "palette": {
+        "background": {
+          "default": "#020617",
+          "surface": "#0f172a",
+          "surface_highlight": "#1e293b"
+        },
+        "primary": {
+          "default": "#8b5cf6",
+          "hover": "#7c3aed",
+          "glow": "0 0 20px rgba(139, 92, 246, 0.5)"
+        },
+        "accent": {
+          "cyan": "#06b6d4",
+          "signal_green": "#10b981",
+          "error": "#ef4444"
+        },
+        "text": {
+          "primary": "#f8fafc",
+          "secondary": "#94a3b8",
+          "muted": "#475569"
+        }
+      },
+      "tailwind_config_extension": {
+        "colors": {
+          "background": "hsl(222, 47%, 11%)",
+          "foreground": "hsl(210, 40%, 98%)",
+          "card": "hsl(217, 33%, 17%)",
+          "card-foreground": "hsl(210, 40%, 98%)",
+          "popover": "hsl(222, 47%, 11%)",
+          "popover-foreground": "hsl(210, 40%, 98%)",
+          "primary": "hsl(262, 83%, 58%)",
+          "primary-foreground": "hsl(210, 40%, 98%)",
+          "secondary": "hsl(217, 33%, 17%)",
+          "secondary-foreground": "hsl(210, 40%, 98%)",
+          "muted": "hsl(217, 33%, 17%)",
+          "muted-foreground": "hsl(215, 20.2%, 65.1%)",
+          "accent": "hsl(217, 33%, 17%)",
+          "accent-foreground": "hsl(210, 40%, 98%)",
+          "destructive": "hsl(0, 62.8%, 30.6%)",
+          "destructive-foreground": "hsl(210, 40%, 98%)",
+          "border": "hsl(217, 33%, 17%)",
+          "input": "hsl(217, 33%, 17%)",
+          "ring": "hsl(262, 83%, 58%)"
+        }
+      }
+    },
+    "visual_enhancers": {
+      "glassmorphism": {
+        "heavy": "bg-slate-950/70 backdrop-blur-xl border border-white/10",
+        "light": "bg-white/5 backdrop-blur-md border border-white/5"
+      },
+      "gradients": {
+        "hero_glow": "bg-gradient-to-tr from-violet-500/20 via-cyan-500/10 to-transparent",
+        "card_hover": "hover:bg-gradient-to-br hover:from-white/5 hover:to-transparent"
+      },
+      "borders": {
+        "subtle": "border border-white/5",
+        "active": "border border-violet-500/50"
+      },
+      "shadows": {
+        "neon": "shadow-[0_0_20px_rgba(139,92,246,0.3)]",
+        "deep": "shadow-2xl shadow-black/50"
+      }
+    },
+    "layout_strategies": {
+      "public_browser": {
+        "type": "Bento Grid + Horizontal Scroll",
+        "structure": "Hero section with search (centered). Below, 'Featured Providers' in a bento grid. Below that, 'All Channels' in a virtualized list or dense grid.",
+        "spacing": "gap-6 md:gap-8"
+      },
+      "admin_dashboard": {
+        "type": "Control Room",
+        "structure": "Sidebar navigation (collapsible). Main content area with 'Stat Cards' at top, 'Playlist Management' table below.",
+        "density": "Compact. Use table views for playlists."
+      },
+      "auth_page": {
+        "type": "Split Screen",
+        "structure": "Left: 50% width with abstract 3D visual. Right: 50% width with minimal login form centered."
+      }
+    },
+    "components": {
+      "buttons": {
+        "style": "Sharp edges or small radius (rounded-md). High contrast.",
+        "primary": "bg-primary text-white hover:bg-primary/90 shadow-neon transition-all duration-300",
+        "secondary": "bg-white/5 text-white hover:bg-white/10 border border-white/10"
+      },
+      "cards": {
+        "style": "Glassmorphic. No solid backgrounds if possible.",
+        "base": "bg-slate-900/50 backdrop-blur-md border border-white/5 hover:border-primary/50 transition-colors duration-300"
+      },
+      "inputs": {
+        "style": "Minimalist. Bottom border only OR deep filled.",
+        "base": "bg-slate-950/50 border-white/10 focus:border-primary focus:ring-1 focus:ring-primary/50 placeholder:text-slate-600"
+      },
+      "channel_list": {
+        "style": "Dense rows or small cards.",
+        "interaction": "Hover reveals 'Copy URL' and 'Open VLC' actions."
+      }
+    },
+    "assets": {
+      "images": [
+        {
+          "category": "hero_background",
+          "url": "https://images.unsplash.com/photo-1764258559704-0b7f0f02cae0?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "description": "Abstract purple/pink neon streaks. Use for Auth page left side and Hero section background (with heavy overlay)."
+        },
+        {
+          "category": "texture_overlay",
+          "url": "https://images.unsplash.com/photo-1526655805340-274e69922288?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "description": "Black sand/noise. Use as a fixed 'mix-blend-overlay' opacity-20 layer over the entire app to kill digital flatness."
+        },
+        {
+          "category": "signal_visual",
+          "url": "https://images.unsplash.com/photo-1762281429312-77566d0ad182?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "description": "Green wavy pattern. Use for 'Active/Online' states or success modals."
+        }
+      ],
+      "icons": {
+        "library": "lucide-react",
+        "style": "Stroke width 1.5px. Color: text-slate-400 (default), text-primary (active)."
+      }
+    },
+    "motion": {
+      "transitions": "transition-all duration-300 ease-out",
+      "hover_effects": "scale-[1.02] brightness-110",
+      "page_load": "animate-in fade-in slide-in-from-bottom-4 duration-700"
+    },
+    "accessibility": {
+      "contrast": "Ensure text-slate-400 is legible on slate-950. Use text-slate-200 for important info.",
+      "focus_states": "Visible ring-2 ring-primary ring-offset-2 ring-offset-slate-950"
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. INSTALLATION: Install 'clsx' and 'tailwind-merge' for dynamic classes if not present.",
+    "2. SETUP: Update tailwind.config.js with the colors provided in 'tailwind_config_extension'.",
+    "3. GLOBAL CSS: Add the @import for fonts in index.css and set the body font-family to 'DM Sans'.",
+    "4. TEXTURE: Create a global <div className='fixed inset-0 pointer-events-none z-50 opacity-[0.03] mix-blend-overlay' style={{ backgroundImage: 'url(...)', backgroundSize: '200px' }} /> using the texture_overlay image.",
+    "5. LAYOUT: Build the 'Public Browser' first. It needs a massive Search Input (h-16 text-xl) in the center of the hero.",
+    "6. COMPONENTS: Customize Shadcn components. Remove 'rounded-xl' and replace with 'rounded-md' or 'rounded-none' for a sharper tech look.",
+    "7. MOCK DATA: When building the UI, mock the M3U8 data structure (Channel Name, Logo, Group, URL) to test the grid.",
+    "8. VLC INTEGRATION: For the 'Open in VLC' feature, use a simple `vlc://` protocol link.",
+    "9. DO NOT use gradients for text. Keep text solid white or gray for readability."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯📚🎭🎬🎪🎉🎊🎁🎀🎂🍰🎈🎨🎰💰💵💳🏦💎🪙💸🤑📊📈📉💹🔢🏆🥇 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Create new components that match the style and conventions of existing components when needed",
+    "Examine existing components to understand the project's component patterns before creating new ones",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use sonner for toasts"
+  ]
+}
