@@ -455,6 +455,7 @@ async def proxy_stream(
 @api_router.get("/proxy/m3u8")
 async def proxy_m3u8(
     url: str = Query(..., description="M3U8 URL to proxy"),
+    api_base: str = Query("", description="API base URL for rewriting"),
     current_user: dict = Depends(get_current_user)
 ):
     """Proxy M3U8 playlist and rewrite URLs to go through proxy"""
@@ -467,8 +468,11 @@ async def proxy_m3u8(
             content = response.text
             
             # Get base URL for relative paths
-            from urllib.parse import urljoin, quote
+            from urllib.parse import urljoin, quote, unquote
             base_url = url.rsplit('/', 1)[0] + '/'
+            
+            # Decode api_base if provided
+            decoded_api_base = unquote(api_base) if api_base else ""
             
             # Rewrite URLs in the M3U8 to go through our proxy
             lines = content.split('\n')
@@ -485,12 +489,20 @@ async def proxy_m3u8(
                     
                     # Check if it's another m3u8 (sub-playlist) or a segment
                     encoded_url = quote(segment_url, safe='')
+                    encoded_api_base = quote(decoded_api_base, safe='')
+                    
                     if '.m3u8' in line.lower() or '.m3u' in line.lower():
                         # Sub-playlist - also proxy through m3u8 endpoint
-                        rewritten_lines.append(f"proxy/m3u8?url={encoded_url}")
+                        if decoded_api_base:
+                            rewritten_lines.append(f"{decoded_api_base}/proxy/m3u8?url={encoded_url}&api_base={encoded_api_base}")
+                        else:
+                            rewritten_lines.append(f"/api/proxy/m3u8?url={encoded_url}")
                     else:
                         # Media segment - proxy through stream endpoint  
-                        rewritten_lines.append(f"proxy/stream?url={encoded_url}")
+                        if decoded_api_base:
+                            rewritten_lines.append(f"{decoded_api_base}/proxy/stream?url={encoded_url}")
+                        else:
+                            rewritten_lines.append(f"/api/proxy/stream?url={encoded_url}")
                 else:
                     rewritten_lines.append(line)
             
