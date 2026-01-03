@@ -133,12 +133,31 @@ export default function HomePage() {
 
   const copyToClipboard = async (url, channelName) => {
     try {
-      await navigator.clipboard.writeText(url);
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // Fallback for non-secure contexts
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
       setCopiedId(channelName);
       toast.success("URL copied to clipboard!");
       setTimeout(() => setCopiedId(null), 2000);
     } catch (error) {
-      toast.error("Failed to copy URL");
+      // Last resort fallback - show the URL in a prompt
+      toast.info("Copy the URL below:", {
+        description: url,
+        duration: 10000,
+      });
     }
   };
 
