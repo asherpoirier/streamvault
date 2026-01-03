@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, Navigate } from "react-router-dom";
 import axios from "axios";
-import Hls from "hls.js";
-import mpegts from "mpegts.js";
+import videojs from "video.js";
+import "video.js/dist/video-js.css";
 import { API, useAuth } from "@/App";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,8 +48,7 @@ export default function HomePage() {
   const [playerError, setPlayerError] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef(null);
-  const hlsRef = useRef(null);
-  const mpegtsRef = useRef(null);
+  const playerRef = useRef(null);
 
   // Fetch providers on load (lightweight - no channel data)
   useEffect(() => {
