@@ -384,6 +384,13 @@ export default function HomePage() {
             video.play().catch(e => console.log("Autoplay prevented:", e));
           });
           
+          player.on(mpegts.Events.STATISTICS_INFO, (stats) => {
+            // If we're receiving data, make sure we're playing
+            if (stats.speed > 0 && video.paused) {
+              video.play().catch(e => console.log("Autoplay prevented:", e));
+            }
+          });
+          
           player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
             console.error("MPEGTS Error:", errorType, errorDetail, errorInfo);
             setPlayerLoading(false);
