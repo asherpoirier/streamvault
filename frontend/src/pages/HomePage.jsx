@@ -112,10 +112,27 @@ export default function HomePage() {
     }
   };
 
-  const openInVLC = (url) => {
-    window.location.href = `vlc://${url}`;
-    toast.info("Opening in VLC...", {
-      description: "Make sure VLC is installed on your system",
+  const openInVLC = (url, channelName) => {
+    // Create a .m3u file content
+    const m3uContent = `#EXTM3U\n#EXTINF:-1,${channelName}\n${url}`;
+    
+    // Create a blob and download it
+    const blob = new Blob([m3uContent], { type: 'audio/x-mpegurl' });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    
+    // Create a temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `${channelName.replace(/[^a-zA-Z0-9]/g, '_')}.m3u`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the blob URL
+    window.URL.revokeObjectURL(downloadUrl);
+    
+    toast.success("M3U file downloaded!", {
+      description: "Open the file with VLC or your preferred media player",
     });
   };
 
@@ -383,8 +400,8 @@ export default function HomePage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 hover:bg-white/10"
-                                onClick={() => openInVLC(channel.url)}
-                                title="Open in VLC"
+                                onClick={() => openInVLC(channel.url, channel.name)}
+                                title="Download M3U for VLC"
                                 data-testid={`open-vlc-btn-${idx}`}
                               >
                                 <Monitor className="w-4 h-4 text-slate-400" />
