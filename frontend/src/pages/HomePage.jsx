@@ -221,15 +221,15 @@ export default function HomePage() {
     
     // Use a small delay to ensure the video element is mounted in the DOM
     const initTimer = setTimeout(() => {
-      // Cleanup previous player
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
+      // Cleanup previous HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
 
       // Need video element
-      const videoElement = videoRef.current;
-      if (!videoElement) {
+      const video = videoRef.current;
+      if (!video) {
         console.error("Video element not found");
         return;
       }
@@ -239,141 +239,151 @@ export default function HomePage() {
       
       // Determine stream type
       const urlLower = originalUrl.toLowerCase();
-      const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist') || urlLower.includes('hls');
+      const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist');
       
-      // Build proxy URL
+      // Build proxy URLs
       const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}&token=${encodeURIComponent(token)}`;
-      
-      // For HLS, use the m3u8 proxy that rewrites URLs
       const apiBase = encodeURIComponent(API);
       const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}&token=${encodeURIComponent(token)}`;
       
-      // Determine the source URL and type
-      let sourceUrl = proxyUrl;
-      let sourceType = 'video/mp2t'; // Default to MPEG-TS
+      console.log("Playing stream:", originalUrl, "isHLS:", isHLS);
       
       if (isHLS) {
-        sourceUrl = hlsProxyUrl;
-        sourceType = 'application/x-mpegURL';
-      } else if (urlLower.includes('.mp4')) {
-        sourceType = 'video/mp4';
-      }
-      
-      console.log("Video.js playing:", originalUrl, "Type:", sourceType, "URL:", sourceUrl);
-      
-      try {
-        // Initialize video.js player with simpler config
-        const player = videojs(videoElement, {
-          autoplay: true,
-          controls: true,
-          responsive: true,
-          fluid: true,
-          preload: 'auto',
-          techOrder: ['html5'],
-          html5: {
-            hls: {
-              withCredentials: false,
-            },
-            nativeVideoTracks: true,
-            nativeAudioTracks: true,
-            nativeTextTracks: true,
-          },
-        });
-        
-        playerRef.current = player;
-        
-        // Event handlers
-        player.on('loadedmetadata', () => {
-          console.log("Video.js: Metadata loaded");
-          setPlayerLoading(false);
-        });
-        
-        player.on('loadeddata', () => {
-          console.log("Video.js: Data loaded");
-          setPlayerLoading(false);
-        });
-        
-        player.on('playing', () => {
-          console.log("Video.js: Playing");
-          setPlayerLoading(false);
-        });
-        
-        player.on('canplay', () => {
-          console.log("Video.js: Can play");
-          setPlayerLoading(false);
-          player.play().catch(e => console.log("Autoplay prevented:", e));
-        });
-        
-        player.on('waiting', () => {
-          console.log("Video.js: Buffering...");
-        });
-        
-        player.on('error', () => {
-          const error = player.error();
-          console.error("Video.js Error:", error);
-          setPlayerLoading(false);
+        // Use hls.js for HLS streams
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: false,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 600,
+            maxBufferSize: 60 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            debug: true,
+          });
           
-          if (error) {
-            if (error.code === 2) {
-              setPlayerError("Network error. The stream may be unavailable or blocked.");
-            } else if (error.code === 3) {
-              setPlayerError("Media decoding error. This stream format may not be supported in your browser. Try copying the URL and using VLC.");
-            } else if (error.code === 4) {
-              setPlayerError("Stream format not supported. Try copying the URL and using VLC.");
-            } else {
-              setPlayerError("Failed to load stream. Try copying the URL and using VLC.");
+          hlsRef.current = hls;
+          
+          // Try direct URL first (some streams support CORS)
+          console.log("Trying HLS with proxy URL:", hlsProxyUrl);
+          hls.loadSource(hlsProxyUrl);
+          hls.attachMedia(video);
+          
+          hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+            console.log("HLS: Manifest parsed, levels:", data.levels.length);
+            setPlayerLoading(false);
+            video.play().catch(e => {
+              console.log("Autoplay prevented:", e);
+              setPlayerLoading(false);
+            });
+          });
+          
+          hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+            console.log("HLS: Level loaded");
+            setPlayerLoading(false);
+          });
+          
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            console.error("HLS Error:", data.type, data.details, data);
+            
+            if (data.fatal) {
+              setPlayerLoading(false);
+              
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  setPlayerError("Network error loading stream. Try copying the URL and using VLC.");
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  // Try to recover from media errors
+                  console.log("Attempting to recover from media error...");
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  setPlayerError("Failed to load stream. Try copying the URL and using VLC.");
+                  break;
+              }
             }
-          }
-        });
+          });
+          
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          // Safari native HLS support
+          video.src = originalUrl; // Try direct URL for Safari
+          video.addEventListener('loadedmetadata', () => {
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          });
+          video.addEventListener('error', () => {
+            setPlayerLoading(false);
+            setPlayerError("Failed to load stream.");
+          });
+        } else {
+          setPlayerError("Your browser doesn't support HLS playback. Try using Chrome, Firefox, or Safari.");
+        }
+      } else {
+        // For non-HLS streams (MPEG-TS, etc), try direct playback via proxy
+        console.log("Trying direct stream via proxy:", proxyUrl);
+        video.src = proxyUrl;
         
-        // Start loading the source
-        player.src({ src: sourceUrl, type: sourceType });
+        video.onloadedmetadata = () => {
+          console.log("Video: Metadata loaded");
+          setPlayerLoading(false);
+          video.play().catch(e => console.log("Autoplay prevented:", e));
+        };
         
-      } catch (err) {
-        console.error("Video.js init error:", err);
-        setPlayerLoading(false);
-        setPlayerError("Failed to initialize video player.");
+        video.oncanplay = () => {
+          console.log("Video: Can play");
+          setPlayerLoading(false);
+        };
+        
+        video.onerror = (e) => {
+          console.error("Video error:", e);
+          setPlayerLoading(false);
+          setPlayerError("Failed to load stream. This format may not be supported in your browser. Try copying the URL and using VLC.");
+        };
+        
+        video.load();
       }
-    }, 100); // Small delay to ensure DOM is ready
+    }, 200); // Delay to ensure DOM is ready
     
     // Force loading state off after timeout
     const loadTimeout = setTimeout(() => {
       setPlayerLoading(false);
-    }, 5000);
+    }, 8000);
     
-    // Error timeout - if nothing plays after 20 seconds
+    // Error timeout - if nothing plays after 25 seconds
     const errorTimeout = setTimeout(() => {
       setPlayerLoading(false);
-      if (!playerRef.current || playerRef.current.paused()) {
+      const video = videoRef.current;
+      if (video && video.paused && video.readyState < 3) {
         setPlayerError("Stream is taking too long to load. Try copying the URL and using VLC.");
       }
-    }, 20000);
+    }, 25000);
 
     return () => {
       clearTimeout(initTimer);
       clearTimeout(loadTimeout);
       clearTimeout(errorTimeout);
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
     };
   }, [playerOpen, currentChannel, token]);
 
   const toggleMute = () => {
-    if (playerRef.current) {
-      const muted = !playerRef.current.muted();
-      playerRef.current.muted(muted);
-      setIsMuted(muted);
+    const video = videoRef.current;
+    if (video) {
+      video.muted = !video.muted;
+      setIsMuted(video.muted);
     }
   };
 
   const toggleFullscreen = () => {
-    if (playerRef.current) {
-      if (playerRef.current.isFullscreen()) {
-        playerRef.current.exitFullscreen();
-      } else {
-        playerRef.current.requestFullscreen();
+    const video = videoRef.current;
+    if (video) {
+      if (video.requestFullscreen) {
+        video.requestFullscreen();
+      } else if (video.webkitRequestFullscreen) {
+        video.webkitRequestFullscreen();
       }
     }
   };
