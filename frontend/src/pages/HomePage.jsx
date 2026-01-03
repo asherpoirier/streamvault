@@ -246,7 +246,11 @@ export default function HomePage() {
         player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
           console.error("MPEGTS Error:", errorType, errorDetail, errorInfo);
           setPlayerLoading(false);
-          setPlayerError("Failed to load stream. The stream may be offline or unavailable.");
+          if (errorDetail && errorDetail.includes && errorDetail.includes('403')) {
+            setPlayerError("Stream access denied - the provider has IP restrictions. Try copying the URL and playing in VLC on your computer.");
+          } else {
+            setPlayerError("Failed to load stream. The stream may be offline, IP-restricted, or unavailable.");
+          }
         });
         
         // Also try to play after a short delay
