@@ -325,6 +325,14 @@ export default function HomePage() {
           video.play().catch(e => console.log("Autoplay prevented:", e));
         }, 3000);
         
+        // Show timeout error after 20 seconds if still loading
+        setTimeout(() => {
+          if (playerLoading) {
+            setPlayerLoading(false);
+            setPlayerError("Stream is taking too long to load. This stream may not be compatible with browser playback. Try copying the URL and playing in VLC.");
+          }
+        }, 20000);
+        
       } else {
         setPlayerLoading(false);
         setPlayerError("Your browser doesn't support MPEG-TS playback. Please copy the URL and use VLC.");
