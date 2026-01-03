@@ -190,12 +190,18 @@ export default function HomePage() {
         hlsRef.current = null;
       }
 
+      setPlayerLoading(true);
+      setPlayerError(null);
+
       // Check if it's an HLS stream
       if (url.includes('.m3u8') || url.includes('.m3u')) {
         if (Hls.isSupported()) {
           const hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
+            xhrSetup: function(xhr) {
+              xhr.withCredentials = false;
+            },
           });
           hlsRef.current = hls;
 
@@ -208,12 +214,27 @@ export default function HomePage() {
           });
 
           hls.on(Hls.Events.ERROR, (event, data) => {
+            console.error("HLS Error:", data);
             if (data.fatal) {
               setPlayerLoading(false);
-              setPlayerError("Failed to load stream. The stream may be offline or unavailable.");
-              console.error("HLS Error:", data);
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                setPlayerError("Network error: The stream may be blocked by CORS policy or the server is unavailable. Try copying the URL and opening in VLC or another media player.");
+              } else {
+                setPlayerError("Failed to load stream. The stream may be offline or in an unsupported format. Copy the URL and try in VLC.");
+              }
             }
           });
+
+          // Timeout for streams that hang
+          const timeout = setTimeout(() => {
+            if (playerLoading) {
+              setPlayerLoading(false);
+              setPlayerError("Stream is taking too long to load. It may be blocked by CORS. Copy the URL and try in VLC or another media player.");
+            }
+          }, 15000);
+
+          return () => clearTimeout(timeout);
+
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           // Safari native HLS support
           video.src = url;
@@ -223,11 +244,11 @@ export default function HomePage() {
           });
           video.addEventListener('error', () => {
             setPlayerLoading(false);
-            setPlayerError("Failed to load stream.");
+            setPlayerError("Failed to load stream. Copy the URL and try in VLC.");
           });
         } else {
           setPlayerLoading(false);
-          setPlayerError("HLS is not supported in this browser.");
+          setPlayerError("HLS is not supported in this browser. Copy the URL and open in VLC.");
         }
       } else {
         // Direct video URL
@@ -238,7 +259,7 @@ export default function HomePage() {
         });
         video.addEventListener('error', () => {
           setPlayerLoading(false);
-          setPlayerError("Failed to load video stream.");
+          setPlayerError("Failed to load video. Copy the URL and try in VLC.");
         });
       }
     }
