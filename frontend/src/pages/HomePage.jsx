@@ -49,6 +49,7 @@ export default function HomePage() {
   const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const mpegtsRef = useRef(null);
 
   // Fetch providers on load (lightweight - no channel data)
   useEffect(() => {
