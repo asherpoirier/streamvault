@@ -425,9 +425,16 @@ async def proxy_m3u8_options():
 @api_router.get("/proxy/stream")
 async def proxy_stream(
     url: str = Query(..., description="Stream URL to proxy"),
-    current_user: dict = Depends(get_current_user)
+    token: Optional[str] = Query(None, description="Auth token")
 ):
     """Proxy a stream to bypass CORS restrictions"""
+    # Verify token if provided (for security)
+    if token:
+        try:
+            jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        except:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    
     try:
         async def stream_generator():
             async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
