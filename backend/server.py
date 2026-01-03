@@ -441,7 +441,7 @@ async def proxy_stream(
         range_header = request.headers.get('Range', None)
         
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
             "Connection": "keep-alive",
@@ -450,28 +450,19 @@ async def proxy_stream(
         if range_header:
             headers["Range"] = range_header
         
-        # First check if stream is accessible
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            check_response = await client.head(url, headers=headers)
-            content_type = check_response.headers.get('content-type', '')
-            
-            # Check if we got an HTML error page instead of video
-            if 'text/html' in content_type:
-                raise HTTPException(status_code=403, detail="Stream access denied - IP restricted")
+        # Skip HEAD check - just try to stream directly
+        # Some servers don't properly support HEAD requests
         
         async def stream_generator():
-            async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0), follow_redirects=True) as client:
                 async with client.stream("GET", url, headers=headers) as response:
+                    if response.status_code >= 400:
+                        return
                     async for chunk in response.aiter_bytes(chunk_size=65536):
                         yield chunk
         
-        # Determine content type based on URL or response
-        # Get content type from HEAD response first
-        response_content_type = check_response.headers.get('content-type', '')
-        
-        if response_content_type and 'video' in response_content_type:
-            content_type = response_content_type
-        elif ".m3u8" in url or ".m3u" in url:
+        # Determine content type based on URL
+        if ".m3u8" in url or ".m3u" in url:
             content_type = "application/vnd.apple.mpegurl"
         elif ".ts" in url:
             content_type = "video/mp2t"
