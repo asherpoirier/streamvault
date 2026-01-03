@@ -491,6 +491,7 @@ async def proxy_stream(
 async def proxy_m3u8(
     url: str = Query(..., description="M3U8 URL to proxy"),
     api_base: str = Query("", description="API base URL for rewriting"),
+    token: Optional[str] = Query(None, description="Auth token"),
     current_user: dict = Depends(get_current_user)
 ):
     """Proxy M3U8 playlist and rewrite URLs to go through proxy"""
