@@ -412,6 +412,16 @@ async def root():
 
 # ============ Stream Proxy ============
 
+@api_router.options("/proxy/stream")
+async def proxy_stream_options():
+    """Handle CORS preflight for proxy stream"""
+    return {"message": "OK"}
+
+@api_router.options("/proxy/m3u8")
+async def proxy_m3u8_options():
+    """Handle CORS preflight for proxy m3u8"""
+    return {"message": "OK"}
+
 @api_router.get("/proxy/stream")
 async def proxy_stream(
     url: str = Query(..., description="Stream URL to proxy"),
