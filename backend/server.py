@@ -467,7 +467,7 @@ async def proxy_m3u8(
             content = response.text
             
             # Get base URL for relative paths
-            from urllib.parse import urljoin, urlparse, quote
+            from urllib.parse import urljoin, quote
             base_url = url.rsplit('/', 1)[0] + '/'
             
             # Rewrite URLs in the M3U8 to go through our proxy
@@ -483,13 +483,14 @@ async def proxy_m3u8(
                     else:
                         segment_url = urljoin(base_url, line)
                     
-                    # Rewrite to go through proxy
+                    # Check if it's another m3u8 (sub-playlist) or a segment
                     encoded_url = quote(segment_url, safe='')
-                    api_base = os.environ.get('API_BASE_URL', '')
-                    if api_base:
-                        rewritten_lines.append(f"{api_base}/api/proxy/stream?url={encoded_url}")
+                    if '.m3u8' in line.lower() or '.m3u' in line.lower():
+                        # Sub-playlist - also proxy through m3u8 endpoint
+                        rewritten_lines.append(f"proxy/m3u8?url={encoded_url}")
                     else:
-                        rewritten_lines.append(f"/api/proxy/stream?url={encoded_url}")
+                        # Media segment - proxy through stream endpoint  
+                        rewritten_lines.append(f"proxy/stream?url={encoded_url}")
                 else:
                     rewritten_lines.append(line)
             
