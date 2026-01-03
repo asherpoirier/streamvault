@@ -231,10 +231,14 @@ export default function HomePage() {
     
     // Use a small delay to ensure the video element is mounted in the DOM
     const initTimer = setTimeout(() => {
-      // Cleanup previous HLS instance
+      // Cleanup previous instances
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
+      }
+      if (mpegtsRef.current) {
+        mpegtsRef.current.destroy();
+        mpegtsRef.current = null;
       }
 
       // Need video element
