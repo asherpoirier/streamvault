@@ -724,13 +724,13 @@ export default function HomePage() {
               </div>
             )}
             
-            <div data-vjs-player>
-              <video
-                ref={videoRef}
-                className="video-js vjs-big-play-centered vjs-theme-dark w-full h-full"
-                playsInline
-              />
-            </div>
+            <video
+              ref={videoRef}
+              className="w-full h-full bg-black"
+              controls
+              autoPlay
+              playsInline
+            />
           </div>
           
           <div className="p-4 flex items-center justify-between border-t border-white/5">
