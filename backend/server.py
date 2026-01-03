@@ -465,14 +465,21 @@ async def proxy_stream(
                     async for chunk in response.aiter_bytes(chunk_size=65536):
                         yield chunk
         
-        # Determine content type based on URL
-        content_type = "application/octet-stream"
-        if ".m3u8" in url or ".m3u" in url:
+        # Determine content type based on URL or response
+        # Get content type from HEAD response first
+        response_content_type = check_response.headers.get('content-type', '')
+        
+        if response_content_type and 'video' in response_content_type:
+            content_type = response_content_type
+        elif ".m3u8" in url or ".m3u" in url:
             content_type = "application/vnd.apple.mpegurl"
         elif ".ts" in url:
             content_type = "video/mp2t"
         elif ".mp4" in url:
             content_type = "video/mp4"
+        else:
+            # Default to MPEG-TS for live streams (most common for IPTV)
+            content_type = "video/mp2t"
         
         return StreamingResponse(
             stream_generator(),
