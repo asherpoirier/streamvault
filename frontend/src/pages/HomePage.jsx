@@ -203,8 +203,12 @@ export default function HomePage() {
             enableWorker: true,
             lowLatencyMode: true,
             xhrSetup: function(xhr, url) {
-              // Add auth token to proxy requests
-              if (url.includes('/api/proxy/')) {
+              // Add auth token to all proxy requests
+              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+              
+              // If URL is relative (from rewritten m3u8), make it absolute
+              if (url.startsWith('proxy/')) {
+                xhr.open('GET', `${API}/${url}`, true);
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
               }
             },
