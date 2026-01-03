@@ -243,42 +243,50 @@ export default function HomePage() {
       } else {
         // Direct stream (TS, MP4, etc) - proxy it directly using fetch with auth
         const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
+        const isTS = originalUrl.toLowerCase().includes('.ts');
         
-        // Use MediaSource API for .ts files or direct src for others
-        const fetchWithAuth = async () => {
-          try {
-            const response = await fetch(proxyUrl, {
-              headers: {
-                'Authorization': `Bearer ${token}`
+        if (isTS) {
+          // .ts files are MPEG-TS segments - browsers can't play them directly
+          // Need to use MSE (Media Source Extensions) or show error
+          setPlayerLoading(false);
+          setPlayerError("This stream uses MPEG-TS format (.ts) which requires a media player like VLC. Use the Copy URL button below to open in VLC.");
+        } else {
+          // Other formats (mp4, etc) - try to play directly
+          const fetchWithAuth = async () => {
+            try {
+              const response = await fetch(proxyUrl, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+              
+              if (!response.ok) {
+                throw new Error('Stream fetch failed');
               }
-            });
-            
-            if (!response.ok) {
-              throw new Error('Stream fetch failed');
+              
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              video.src = blobUrl;
+              
+              video.onloadedmetadata = () => {
+                setPlayerLoading(false);
+                video.play().catch(e => console.log("Autoplay prevented:", e));
+              };
+              
+              video.onerror = () => {
+                setPlayerLoading(false);
+                setPlayerError("Failed to play stream. Format may not be supported in browser.");
+              };
+              
+            } catch (error) {
+              console.error("Fetch error:", error);
+              setPlayerLoading(false);
+              setPlayerError("Failed to load stream. The stream may be offline.");
             }
-            
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            video.src = blobUrl;
-            
-            video.onloadedmetadata = () => {
-              setPlayerLoading(false);
-              video.play().catch(e => console.log("Autoplay prevented:", e));
-            };
-            
-            video.onerror = () => {
-              setPlayerLoading(false);
-              setPlayerError("Failed to play stream. Format may not be supported in browser.");
-            };
-            
-          } catch (error) {
-            console.error("Fetch error:", error);
-            setPlayerLoading(false);
-            setPlayerError("Failed to load stream. The stream may be offline.");
-          }
-        };
-        
-        fetchWithAuth();
+          };
+          
+          fetchWithAuth();
+        }
       }
 
       // Timeout for streams that hang
