@@ -335,18 +335,19 @@ export default function HomePage() {
   }, [playerOpen, currentChannel, token, playerLoading]);
 
   const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsMuted(!isMuted);
+    if (playerRef.current) {
+      const muted = !playerRef.current.muted();
+      playerRef.current.muted(muted);
+      setIsMuted(muted);
     }
   };
 
   const toggleFullscreen = () => {
-    if (videoRef.current) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
-      } else if (videoRef.current.webkitRequestFullscreen) {
-        videoRef.current.webkitRequestFullscreen();
+    if (playerRef.current) {
+      if (playerRef.current.isFullscreen()) {
+        playerRef.current.exitFullscreen();
+      } else {
+        playerRef.current.requestFullscreen();
       }
     }
   };
