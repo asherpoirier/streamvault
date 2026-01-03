@@ -344,23 +344,23 @@ export default function HomePage() {
           }, {
             enableWorker: true,
             enableStashBuffer: true,
-            stashInitialSize: 1024 * 1024, // 1MB initial buffer
+            stashInitialSize: 2 * 1024 * 1024, // 2MB initial buffer for smoother playback
             lazyLoad: false,
             lazyLoadMaxDuration: 5 * 60,
             lazyLoadRecoverDuration: 30,
             deferLoadAfterSourceOpen: false,
             autoCleanupSourceBuffer: true,
-            autoCleanupMaxBackwardDuration: 30,
-            autoCleanupMinBackwardDuration: 15,
+            autoCleanupMaxBackwardDuration: 60,
+            autoCleanupMinBackwardDuration: 30,
             fixAudioTimestampGap: true,
             accurateSeek: false,
             seekType: 'range',
             reuseRedirectedURL: true,
-            liveBufferLatencyChasing: true,
-            liveBufferLatencyMaxLatency: 1.5,
-            liveBufferLatencyMinRemain: 0.3,
-            liveSync: true,
-            liveSyncTargetLatency: 2.0,
+            // Live streaming optimizations
+            liveBufferLatencyChasing: false, // Disable to prevent constant catching up
+            liveBufferLatencyMaxLatency: 5.0, // Allow more latency for smoother playback
+            liveBufferLatencyMinRemain: 1.0,
+            liveSync: false, // Disable live sync to prevent stuttering
           });
           
           mpegtsRef.current = player;
