@@ -623,7 +623,7 @@ export default function HomePage() {
           
           <div className="relative bg-black aspect-video">
             {playerLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black">
+              <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                 <div className="text-center">
                   <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-2" />
                   <p className="text-slate-400">Loading stream...</p>
@@ -632,7 +632,7 @@ export default function HomePage() {
             )}
             
             {playerError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black">
+              <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
                 <div className="text-center p-8 max-w-md">
                   <Tv className="w-16 h-16 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400 mb-4 text-sm">{playerError}</p>
@@ -652,13 +652,15 @@ export default function HomePage() {
               </div>
             )}
             
-            <video
-              ref={videoRef}
-              className="w-full h-full"
-              controls
-              autoPlay
-              playsInline
-            />
+            {!playerError && (
+              <video
+                ref={videoRef}
+                className="w-full h-full"
+                controls
+                autoPlay
+                playsInline
+              />
+            )}
           </div>
           
           <div className="p-4 flex items-center justify-between border-t border-white/5">
