@@ -182,7 +182,7 @@ export default function HomePage() {
   useEffect(() => {
     if (playerOpen && currentChannel && videoRef.current) {
       const video = videoRef.current;
-      const url = currentChannel.url;
+      const originalUrl = currentChannel.url;
 
       // Cleanup previous HLS instance
       if (hlsRef.current) {
@@ -193,19 +193,25 @@ export default function HomePage() {
       setPlayerLoading(true);
       setPlayerError(null);
 
+      // Use proxy URL for the stream
+      const proxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}`;
+
       // Check if it's an HLS stream
-      if (url.includes('.m3u8') || url.includes('.m3u')) {
+      if (originalUrl.includes('.m3u8') || originalUrl.includes('.m3u')) {
         if (Hls.isSupported()) {
           const hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
-            xhrSetup: function(xhr) {
-              xhr.withCredentials = false;
+            xhrSetup: function(xhr, url) {
+              // Add auth token to proxy requests
+              if (url.includes('/api/proxy/')) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+              }
             },
           });
           hlsRef.current = hls;
 
-          hls.loadSource(url);
+          hls.loadSource(proxyUrl);
           hls.attachMedia(video);
 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -218,9 +224,9 @@ export default function HomePage() {
             if (data.fatal) {
               setPlayerLoading(false);
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                setPlayerError("Network error: The stream may be blocked by CORS policy or the server is unavailable. Try copying the URL and opening in VLC or another media player.");
+                setPlayerError("Network error: Failed to load the stream. The stream may be offline or unavailable.");
               } else {
-                setPlayerError("Failed to load stream. The stream may be offline or in an unsupported format. Copy the URL and try in VLC.");
+                setPlayerError("Failed to load stream. The stream may be offline or in an unsupported format.");
               }
             }
           });
@@ -229,41 +235,42 @@ export default function HomePage() {
           const timeout = setTimeout(() => {
             if (playerLoading) {
               setPlayerLoading(false);
-              setPlayerError("Stream is taking too long to load. It may be blocked by CORS. Copy the URL and try in VLC or another media player.");
+              setPlayerError("Stream is taking too long to load. It may be offline or unavailable.");
             }
-          }, 15000);
+          }, 20000);
 
           return () => clearTimeout(timeout);
 
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           // Safari native HLS support
-          video.src = url;
+          video.src = proxyUrl;
           video.addEventListener('loadedmetadata', () => {
             setPlayerLoading(false);
             video.play().catch(e => console.log("Autoplay prevented:", e));
           });
           video.addEventListener('error', () => {
             setPlayerLoading(false);
-            setPlayerError("Failed to load stream. Copy the URL and try in VLC.");
+            setPlayerError("Failed to load stream.");
           });
         } else {
           setPlayerLoading(false);
-          setPlayerError("HLS is not supported in this browser. Copy the URL and open in VLC.");
+          setPlayerError("HLS is not supported in this browser.");
         }
       } else {
-        // Direct video URL
-        video.src = url;
+        // Direct video URL - also proxy it
+        const directProxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
+        video.src = directProxyUrl;
         video.addEventListener('loadedmetadata', () => {
           setPlayerLoading(false);
           video.play().catch(e => console.log("Autoplay prevented:", e));
         });
         video.addEventListener('error', () => {
           setPlayerLoading(false);
-          setPlayerError("Failed to load video. Copy the URL and try in VLC.");
+          setPlayerError("Failed to load video.");
         });
       }
     }
-  }, [playerOpen, currentChannel]);
+  }, [playerOpen, currentChannel, token]);
 
   const toggleMute = () => {
     if (videoRef.current) {
