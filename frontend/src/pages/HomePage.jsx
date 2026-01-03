@@ -650,15 +650,20 @@ export default function HomePage() {
                 <Maximize className="w-4 h-4 text-slate-400" />
               </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyToClipboard(currentChannel?.url, currentChannel?.name)}
-              className="bg-transparent border-white/10"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy URL
-            </Button>
+            <div className="flex items-center gap-2">
+              <code className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded max-w-xs truncate hidden sm:block">
+                {currentChannel?.url}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(currentChannel?.url, currentChannel?.name)}
+                className="bg-transparent border-white/10 shrink-0"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy URL
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
