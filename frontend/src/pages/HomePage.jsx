@@ -264,16 +264,15 @@ export default function HomePage() {
     } else if (isHLS) {
       // HLS stream - use proxy with URL rewriting
       const apiBase = encodeURIComponent(API);
-      const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}`;
+      const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}&token=${encodeURIComponent(token)}`;
       
       if (Hls.isSupported()) {
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
           xhrSetup: function(xhr, url) {
-            if (url.includes('/api/proxy/')) {
-              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-            }
+            // Add auth header for proxy requests
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
           },
         });
         hlsRef.current = hls;
