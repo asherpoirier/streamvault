@@ -214,8 +214,8 @@ export default function HomePage() {
     setPlayerLoading(true);
     setPlayerError(null);
     
-    // Proxy URL for the stream
-    const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
+    // Proxy URL for the stream - include token as query param for mpegts.js
+    const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}&token=${encodeURIComponent(token)}`;
     
     if (isTS && !isHLS) {
       // Use mpegts.js for MPEG-TS streams
