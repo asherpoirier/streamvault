@@ -204,9 +204,9 @@ export default function HomePage() {
   };
 
   const closePlayer = () => {
-    if (playerRef.current) {
-      playerRef.current.dispose();
-      playerRef.current = null;
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
     setPlayerOpen(false);
     setCurrentChannel(null);
