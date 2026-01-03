@@ -122,3 +122,55 @@
         display: contents !important;
     }
 }
+
+/* Video.js dark theme customization */
+.video-js {
+    background-color: #000;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.video-js .vjs-big-play-button {
+    background-color: rgba(139, 92, 246, 0.8);
+    border: none;
+    border-radius: 50%;
+    width: 70px;
+    height: 70px;
+    line-height: 70px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.video-js:hover .vjs-big-play-button {
+    background-color: rgba(139, 92, 246, 1);
+}
+
+.video-js .vjs-control-bar {
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+    height: 40px;
+}
+
+.video-js .vjs-play-progress {
+    background-color: #8b5cf6;
+}
+
+.video-js .vjs-volume-level {
+    background-color: #8b5cf6;
+}
+
+.video-js .vjs-slider {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.video-js .vjs-load-progress {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.video-js .vjs-time-control {
+    font-size: 12px;
+}
+
+.vjs-theme-dark .vjs-control:focus,
+.vjs-theme-dark .vjs-control:hover {
+    color: #8b5cf6;
+}
