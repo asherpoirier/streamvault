@@ -127,6 +127,9 @@ frontend:
     needs_retesting: false
     status_history:
       - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Copy URL functionality working perfectly. Tested with Public Test provider (1436 channels). Channel card copy buttons show success toast 'URL copied to clipboard!' and copy valid M3U8 URLs (e.g., https://3abn.bozztv.com/3abn2/d2d_live/smil:d2d_live.smil/playlist.m3u8). Hover functionality works to reveal copy buttons. Tested multiple channels - no blank copies detected. Main agent's textarea fallback fix successful."
+      - working: true
         agent: "main"
         comment: "Fixed copy functionality with textarea fallback method. Now shows 'URL copied to clipboard!' success toast on both channel cards and modal. Tested with Public Test provider."
       - working: false
@@ -141,6 +144,9 @@ frontend:
     priority: "high"
     needs_retesting: false
     status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Player modal Copy URL button working perfectly. Modal opens correctly, displays correct URL in footer, Copy URL button shows success toast 'URL copied to clipboard!'. URL displayed matches channel stream URL. No issues detected."
       - working: true
         agent: "main"
         comment: "Fixed copy functionality with textarea fallback. Modal Copy URL button now working."
