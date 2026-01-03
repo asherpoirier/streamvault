@@ -599,17 +599,21 @@ export default function HomePage() {
             
             {playerError && (
               <div className="absolute inset-0 flex items-center justify-center bg-black">
-                <div className="text-center p-8">
+                <div className="text-center p-8 max-w-md">
                   <Tv className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400 mb-4">{playerError}</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => copyToClipboard(currentChannel?.url, currentChannel?.name)}
-                    className="bg-transparent border-white/10"
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy URL to play in VLC
-                  </Button>
+                  <p className="text-slate-400 mb-4 text-sm">{playerError}</p>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={() => copyToClipboard(currentChannel?.url, currentChannel?.name)}
+                      className="bg-primary hover:bg-primary/90 w-full"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Stream URL
+                    </Button>
+                    <p className="text-xs text-slate-500">
+                      Open VLC → Media → Open Network Stream → Paste URL
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
