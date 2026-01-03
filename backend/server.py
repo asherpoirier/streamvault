@@ -450,6 +450,15 @@ async def proxy_stream(
         if range_header:
             headers["Range"] = range_header
         
+        # First check if stream is accessible
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            check_response = await client.head(url, headers=headers)
+            content_type = check_response.headers.get('content-type', '')
+            
+            # Check if we got an HTML error page instead of video
+            if 'text/html' in content_type:
+                raise HTTPException(status_code=403, detail="Stream access denied - IP restricted")
+        
         async def stream_generator():
             async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
                 async with client.stream("GET", url, headers=headers) as response:
