@@ -142,6 +142,25 @@ export default function HomePage() {
       return;
     }
     
+    // Helper function to copy using textarea fallback
+    const copyWithTextarea = () => {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return success;
+      } catch (e) {
+        return false;
+      }
+    };
+    
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
@@ -150,18 +169,34 @@ export default function HomePage() {
         toast.success("URL copied to clipboard!");
         setTimeout(() => setCopiedId(null), 2000);
       } else {
-        // Fallback for non-secure contexts - show URL in toast
-        toast.info("Copy this URL:", {
+        // Fallback: try textarea method
+        const success = copyWithTextarea();
+        if (success) {
+          setCopiedId(channelName);
+          toast.success("URL copied to clipboard!");
+          setTimeout(() => setCopiedId(null), 2000);
+        } else {
+          // Show URL in toast as last resort
+          toast.info("Copy this URL:", {
+            description: url,
+            duration: 15000,
+          });
+        }
+      }
+    } catch (error) {
+      // Try textarea fallback on error
+      const success = copyWithTextarea();
+      if (success) {
+        setCopiedId(channelName);
+        toast.success("URL copied to clipboard!");
+        setTimeout(() => setCopiedId(null), 2000);
+      } else {
+        // Show URL in toast as last resort
+        toast.info("Copy this URL manually:", {
           description: url,
           duration: 15000,
         });
       }
-    } catch (error) {
-      // Show URL in toast as last resort
-      toast.info("Copy this URL manually:", {
-        description: url,
-        duration: 15000,
-      });
     }
   };
 
