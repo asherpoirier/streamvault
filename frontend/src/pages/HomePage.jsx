@@ -703,15 +703,13 @@ export default function HomePage() {
               </div>
             )}
             
-            {!playerError && (
-              <video
-                ref={videoRef}
-                className="w-full h-full"
-                controls
-                autoPlay
-                playsInline
-              />
-            )}
+            <video
+              ref={videoRef}
+              className="w-full h-full"
+              controls
+              autoPlay
+              playsInline
+            />
           </div>
           
           <div className="p-4 flex items-center justify-between border-t border-white/5">
