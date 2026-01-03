@@ -273,6 +273,23 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="User not found")
     return UserResponse(**user)
 
+@api_router.get("/users", response_model=List[UserResponse])
+async def list_users(admin: dict = Depends(get_admin_user)):
+    """List all users (admin only)"""
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(100)
+    return [UserResponse(**u) for u in users]
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Delete a user (admin only, cannot delete self)"""
+    if user_id == admin["sub"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User deleted"}
+
 # ============ Playlist Routes (Admin) ============
 
 @api_router.post("/playlists", response_model=PlaylistResponse)
