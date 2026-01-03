@@ -253,7 +253,7 @@ async def setup_admin(user_data: UserCreate):
 async def login(user_data: UserLogin):
     user = await db.users.find_one({"username": user_data.username}, {"_id": 0})
     
-    if not user or not verify_password(user_data.password, user["password_hash"]):
+    if not user or not verify_password(user_data.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_access_token(user["id"], user["username"], user["is_admin"])
