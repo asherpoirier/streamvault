@@ -342,12 +342,30 @@ export default function HomePage() {
         setPlayerError("Failed to initialize video player.");
       }
     }, 100); // Small delay to ensure DOM is ready
+    
+    // Force loading state off after timeout
+    const loadTimeout = setTimeout(() => {
+      setPlayerLoading(false);
+    }, 5000);
+    
+    // Error timeout - if nothing plays after 20 seconds
+    const errorTimeout = setTimeout(() => {
+      setPlayerLoading(false);
+      if (!playerRef.current || playerRef.current.paused()) {
+        setPlayerError("Stream is taking too long to load. Try copying the URL and using VLC.");
+      }
+    }, 20000);
 
     return () => {
+      clearTimeout(initTimer);
       clearTimeout(loadTimeout);
       clearTimeout(errorTimeout);
+      if (playerRef.current) {
+        playerRef.current.dispose();
+        playerRef.current = null;
+      }
     };
-  }, [playerOpen, currentChannel, token, playerLoading]);
+  }, [playerOpen, currentChannel, token]);
 
   const toggleMute = () => {
     if (playerRef.current) {
