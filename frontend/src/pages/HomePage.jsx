@@ -57,14 +57,12 @@ export default function HomePage() {
     }
   }, [token]);
 
-  // Cleanup HLS/MPEGTS on unmount
+  // Cleanup video.js on unmount
   useEffect(() => {
     return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-      }
-      if (mpegtsRef.current) {
-        mpegtsRef.current.destroy();
+      if (playerRef.current) {
+        playerRef.current.dispose();
+        playerRef.current = null;
       }
     };
   }, []);
