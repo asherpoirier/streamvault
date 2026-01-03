@@ -137,31 +137,30 @@ export default function HomePage() {
   }, {});
 
   const copyToClipboard = async (url, channelName) => {
+    if (!url) {
+      toast.error("No URL to copy");
+      return;
+    }
+    
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(url);
+        setCopiedId(channelName);
+        toast.success("URL copied to clipboard!");
+        setTimeout(() => setCopiedId(null), 2000);
       } else {
-        // Fallback for non-secure contexts
-        const textArea = document.createElement("textarea");
-        textArea.value = url;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        textArea.remove();
+        // Fallback for non-secure contexts - show URL in toast
+        toast.info("Copy this URL:", {
+          description: url,
+          duration: 15000,
+        });
       }
-      setCopiedId(channelName);
-      toast.success("URL copied to clipboard!");
-      setTimeout(() => setCopiedId(null), 2000);
     } catch (error) {
-      // Last resort fallback - show the URL in a prompt
-      toast.info("Copy the URL below:", {
+      // Show URL in toast as last resort
+      toast.info("Copy this URL manually:", {
         description: url,
-        duration: 10000,
+        duration: 15000,
       });
     }
   };
