@@ -335,10 +335,11 @@ EOF
     log_info "Python dependencies installed"
     
     # Frontend .env
+    # Note: Don't include /api - nginx proxies /api/ to backend
     if [[ "$DOMAIN" == "localhost" ]]; then
-        BACKEND_URL="http://localhost/api"
+        BACKEND_URL="http://localhost"
     else
-        BACKEND_URL="http://$DOMAIN/api"
+        BACKEND_URL="http://$DOMAIN"
     fi
     
     cat > $APP_DIR/frontend/.env << EOF
