@@ -489,14 +489,22 @@ async def proxy_stream(
 async def proxy_m3u8(
     url: str = Query(..., description="M3U8 URL to proxy"),
     api_base: str = Query("", description="API base URL for rewriting"),
-    token: Optional[str] = Query(None, description="Auth token"),
-    current_user: dict = Depends(get_current_user)
+    token: Optional[str] = Query(None, description="Auth token")
 ):
     """Proxy M3U8 playlist and rewrite URLs to go through proxy"""
+    # Verify token if provided
+    if token:
+        try:
+            jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        except:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    else:
+        raise HTTPException(status_code=401, detail="Token required")
+    
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
             })
             response.raise_for_status()
             content = response.text
