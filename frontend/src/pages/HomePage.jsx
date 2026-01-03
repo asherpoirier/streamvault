@@ -58,11 +58,14 @@ export default function HomePage() {
     }
   }, [token]);
 
-  // Cleanup HLS on unmount
+  // Cleanup HLS/MPEGTS on unmount
   useEffect(() => {
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
+      }
+      if (mpegtsRef.current) {
+        mpegtsRef.current.destroy();
       }
     };
   }, []);
