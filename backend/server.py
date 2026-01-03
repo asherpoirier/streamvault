@@ -532,19 +532,20 @@ async def proxy_m3u8(
                     # Check if it's another m3u8 (sub-playlist) or a segment
                     encoded_url = quote(segment_url, safe='')
                     encoded_api_base = quote(decoded_api_base, safe='')
+                    encoded_token = quote(token, safe='') if token else ''
                     
                     if '.m3u8' in line.lower() or '.m3u' in line.lower():
                         # Sub-playlist - also proxy through m3u8 endpoint
                         if decoded_api_base:
-                            rewritten_lines.append(f"{decoded_api_base}/proxy/m3u8?url={encoded_url}&api_base={encoded_api_base}")
+                            rewritten_lines.append(f"{decoded_api_base}/proxy/m3u8?url={encoded_url}&api_base={encoded_api_base}&token={encoded_token}")
                         else:
-                            rewritten_lines.append(f"/api/proxy/m3u8?url={encoded_url}")
+                            rewritten_lines.append(f"/api/proxy/m3u8?url={encoded_url}&token={encoded_token}")
                     else:
                         # Media segment - proxy through stream endpoint  
                         if decoded_api_base:
-                            rewritten_lines.append(f"{decoded_api_base}/proxy/stream?url={encoded_url}")
+                            rewritten_lines.append(f"{decoded_api_base}/proxy/stream?url={encoded_url}&token={encoded_token}")
                         else:
-                            rewritten_lines.append(f"/api/proxy/stream?url={encoded_url}")
+                            rewritten_lines.append(f"/api/proxy/stream?url={encoded_url}&token={encoded_token}")
                 else:
                     rewritten_lines.append(line)
             
