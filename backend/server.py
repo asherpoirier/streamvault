@@ -410,6 +410,104 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
 async def root():
     return {"message": "StreamVault API"}
 
+# ============ Stream Proxy ============
+
+@api_router.get("/proxy/stream")
+async def proxy_stream(
+    url: str = Query(..., description="Stream URL to proxy"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Proxy a stream to bypass CORS restrictions"""
+    try:
+        async def stream_generator():
+            async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+                async with client.stream("GET", url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "*/*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Connection": "keep-alive",
+                }) as response:
+                    async for chunk in response.aiter_bytes(chunk_size=65536):
+                        yield chunk
+        
+        # Determine content type based on URL
+        content_type = "application/octet-stream"
+        if ".m3u8" in url or ".m3u" in url:
+            content_type = "application/vnd.apple.mpegurl"
+        elif ".ts" in url:
+            content_type = "video/mp2t"
+        elif ".mp4" in url:
+            content_type = "video/mp4"
+        
+        return StreamingResponse(
+            stream_generator(),
+            media_type=content_type,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-cache",
+            }
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch stream: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
+
+@api_router.get("/proxy/m3u8")
+async def proxy_m3u8(
+    url: str = Query(..., description="M3U8 URL to proxy"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Proxy M3U8 playlist and rewrite URLs to go through proxy"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            })
+            response.raise_for_status()
+            content = response.text
+            
+            # Get base URL for relative paths
+            from urllib.parse import urljoin, urlparse, quote
+            base_url = url.rsplit('/', 1)[0] + '/'
+            
+            # Rewrite URLs in the M3U8 to go through our proxy
+            lines = content.split('\n')
+            rewritten_lines = []
+            
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # This is a URL line
+                    if line.startswith('http'):
+                        segment_url = line
+                    else:
+                        segment_url = urljoin(base_url, line)
+                    
+                    # Rewrite to go through proxy
+                    encoded_url = quote(segment_url, safe='')
+                    api_base = os.environ.get('API_BASE_URL', '')
+                    if api_base:
+                        rewritten_lines.append(f"{api_base}/api/proxy/stream?url={encoded_url}")
+                    else:
+                        rewritten_lines.append(f"/api/proxy/stream?url={encoded_url}")
+                else:
+                    rewritten_lines.append(line)
+            
+            rewritten_content = '\n'.join(rewritten_lines)
+            
+            return StreamingResponse(
+                iter([rewritten_content.encode()]),
+                media_type="application/vnd.apple.mpegurl",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-cache",
+                }
+            )
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch M3U8: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
+
 # Include the router in the main app
 app.include_router(api_router)
 
