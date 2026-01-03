@@ -18,7 +18,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-REPO_URL="https://github.com/YOUR_USERNAME/streamvault.git"
+REPO_URL="https://github.com/asherpoirier/streamvault.git"
 INSTALL_DIR="/tmp/streamvault-install"
 
 echo -e "${BLUE}"

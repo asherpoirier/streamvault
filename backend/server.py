@@ -198,7 +198,7 @@ async def register(user_data: UserCreate, admin: dict = Depends(get_admin_user))
     user_doc = {
         "id": user_id,
         "username": user_data.username,
-        "password_hash": hash_password(user_data.password),
+        "hashed_password": hash_password(user_data.password),
         "is_admin": is_admin,
         "created_at": now
     }
@@ -230,7 +230,7 @@ async def setup_admin(user_data: UserCreate):
     user_doc = {
         "id": user_id,
         "username": user_data.username,
-        "password_hash": hash_password(user_data.password),
+        "hashed_password": hash_password(user_data.password),
         "is_admin": True,
         "created_at": now
     }
@@ -270,7 +270,7 @@ async def login(user_data: UserLogin):
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
-    user = await db.users.find_one({"id": current_user["sub"]}, {"_id": 0, "password_hash": 0})
+    user = await db.users.find_one({"id": current_user["sub"]}, {"_id": 0, "hashed_password": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return UserResponse(**user)
@@ -278,7 +278,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 @api_router.get("/users", response_model=List[UserResponse])
 async def list_users(admin: dict = Depends(get_admin_user)):
     """List all users (admin only)"""
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(100)
+    users = await db.users.find({}, {"_id": 0, "hashed_password": 0}).to_list(100)
     return [UserResponse(**u) for u in users]
 
 @api_router.delete("/users/{user_id}")
