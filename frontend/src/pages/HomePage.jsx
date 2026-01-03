@@ -255,8 +255,9 @@ export default function HomePage() {
     // Proxy URL for the stream - include token as query param for mpegts.js
     const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}&token=${encodeURIComponent(token)}`;
     
-    if (isTS && !isHLS) {
-      // Use mpegts.js for MPEG-TS streams
+    if ((isTS || assumeTS) && !isHLS) {
+      // Use mpegts.js for MPEG-TS streams (including extensionless URLs)
+      console.log("Using mpegts.js for stream:", originalUrl);
       if (mpegts.isSupported()) {
         const player = mpegts.createPlayer({
           type: 'mpegts',
