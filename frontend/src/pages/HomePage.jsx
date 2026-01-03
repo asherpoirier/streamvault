@@ -193,22 +193,19 @@ export default function HomePage() {
     
     const originalUrl = currentChannel.url;
 
-    // Cleanup previous HLS instance
+    // Cleanup previous instances
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
+    }
+    if (mpegtsRef.current) {
+      mpegtsRef.current.destroy();
+      mpegtsRef.current = null;
     }
 
     // Check file type first - before needing video ref
     const isHLS = originalUrl.toLowerCase().includes('.m3u8') || originalUrl.toLowerCase().includes('.m3u');
     const isTS = originalUrl.toLowerCase().endsWith('.ts') || originalUrl.toLowerCase().includes('.ts?');
-    
-    // .ts files can't be played directly in browser
-    if (isTS && !isHLS) {
-      setPlayerLoading(false);
-      setPlayerError("This stream uses MPEG-TS format (.ts) which browsers cannot play directly. Click 'Copy Stream URL' below and paste it in VLC Media Player (Media → Open Network Stream).");
-      return;
-    }
     
     // Need video ref for playable formats
     const video = videoRef.current;
@@ -217,10 +214,54 @@ export default function HomePage() {
     setPlayerLoading(true);
     setPlayerError(null);
     
-    if (isHLS) {
+    // Proxy URL for the stream
+    const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
+    
+    if (isTS && !isHLS) {
+      // Use mpegts.js for MPEG-TS streams
+      if (mpegts.isSupported()) {
+        const player = mpegts.createPlayer({
+          type: 'mpegts',
+          isLive: true,
+          url: proxyUrl,
+        }, {
+          enableWorker: true,
+          lazyLoadMaxDuration: 3 * 60,
+          seekType: 'range',
+        });
+        
+        mpegtsRef.current = player;
+        player.attachMediaElement(video);
+        player.load();
+        
+        player.on(mpegts.Events.LOADING_COMPLETE, () => {
+          setPlayerLoading(false);
+        });
+        
+        player.on(mpegts.Events.METADATA_ARRIVED, () => {
+          setPlayerLoading(false);
+          video.play().catch(e => console.log("Autoplay prevented:", e));
+        });
+        
+        player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+          console.error("MPEGTS Error:", errorType, errorDetail, errorInfo);
+          setPlayerLoading(false);
+          setPlayerError("Failed to load stream. The stream may be offline or unavailable.");
+        });
+        
+        // Also try to play after a short delay
+        setTimeout(() => {
+          video.play().catch(e => console.log("Autoplay prevented:", e));
+        }, 1000);
+        
+      } else {
+        setPlayerLoading(false);
+        setPlayerError("Your browser doesn't support MPEG-TS playback. Please copy the URL and use VLC.");
+      }
+    } else if (isHLS) {
       // HLS stream - use proxy with URL rewriting
       const apiBase = encodeURIComponent(API);
-      const proxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}`;
+      const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}`;
       
       if (Hls.isSupported()) {
         const hls = new Hls({
@@ -234,7 +275,7 @@ export default function HomePage() {
         });
         hlsRef.current = hls;
 
-        hls.loadSource(proxyUrl);
+        hls.loadSource(hlsProxyUrl);
         hls.attachMedia(video);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -250,7 +291,7 @@ export default function HomePage() {
           }
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = proxyUrl;
+        video.src = hlsProxyUrl;
         video.addEventListener('loadedmetadata', () => {
           setPlayerLoading(false);
           video.play().catch(e => console.log("Autoplay prevented:", e));
@@ -262,8 +303,6 @@ export default function HomePage() {
       }
     } else {
       // Other formats (mp4, etc) - try to play directly via proxy
-      const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
-      
       const fetchWithAuth = async () => {
         try {
           const response = await fetch(proxyUrl, {
