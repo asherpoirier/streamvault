@@ -205,13 +205,9 @@ export default function HomePage() {
   };
 
   const closePlayer = () => {
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-    if (mpegtsRef.current) {
-      mpegtsRef.current.destroy();
-      mpegtsRef.current = null;
+    if (playerRef.current) {
+      playerRef.current.dispose();
+      playerRef.current = null;
     }
     setPlayerOpen(false);
     setCurrentChannel(null);
