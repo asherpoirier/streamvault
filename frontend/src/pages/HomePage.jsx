@@ -228,6 +228,9 @@ export default function HomePage() {
           enableWorker: true,
           lazyLoadMaxDuration: 3 * 60,
           seekType: 'range',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
         
         mpegtsRef.current = player;
