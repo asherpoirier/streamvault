@@ -241,37 +241,44 @@ export default function HomePage() {
           });
         }
       } else {
-        // Direct stream (TS, MP4, etc) - proxy it directly
+        // Direct stream (TS, MP4, etc) - proxy it directly using fetch with auth
         const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
         
-        video.src = proxyUrl;
-        
-        const onLoadedMetadata = () => {
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
+        // Use MediaSource API for .ts files or direct src for others
+        const fetchWithAuth = async () => {
+          try {
+            const response = await fetch(proxyUrl, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error('Stream fetch failed');
+            }
+            
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            video.src = blobUrl;
+            
+            video.onloadedmetadata = () => {
+              setPlayerLoading(false);
+              video.play().catch(e => console.log("Autoplay prevented:", e));
+            };
+            
+            video.onerror = () => {
+              setPlayerLoading(false);
+              setPlayerError("Failed to play stream. Format may not be supported in browser.");
+            };
+            
+          } catch (error) {
+            console.error("Fetch error:", error);
+            setPlayerLoading(false);
+            setPlayerError("Failed to load stream. The stream may be offline.");
+          }
         };
         
-        const onError = () => {
-          setPlayerLoading(false);
-          setPlayerError("Failed to load stream. The stream may be offline or in an unsupported format.");
-        };
-
-        const onCanPlay = () => {
-          setPlayerLoading(false);
-        };
-        
-        video.addEventListener('loadedmetadata', onLoadedMetadata);
-        video.addEventListener('canplay', onCanPlay);
-        video.addEventListener('error', onError);
-        
-        // Try to load
-        video.load();
-        
-        return () => {
-          video.removeEventListener('loadedmetadata', onLoadedMetadata);
-          video.removeEventListener('canplay', onCanPlay);
-          video.removeEventListener('error', onError);
-        };
+        fetchWithAuth();
       }
 
       // Timeout for streams that hang
