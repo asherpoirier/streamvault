@@ -56,12 +56,12 @@ export default function HomePage() {
     }
   }, [token]);
 
-  // Cleanup video.js on unmount
+  // Cleanup HLS on unmount
   useEffect(() => {
     return () => {
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
     };
   }, []);
