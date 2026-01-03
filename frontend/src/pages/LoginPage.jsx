@@ -19,11 +19,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      if (user.is_admin) {
-        navigate("/admin", { replace: true });
-      } else {
-        navigate("/", { replace: true });
-      }
+      navigate("/", { replace: true });
     }
   }, [user, navigate]);
 
@@ -37,7 +33,8 @@ export default function LoginPage() {
         toast.success("Welcome back!", {
           description: `Logged in as ${userData.username}`,
         });
-        navigate(userData.is_admin ? "/admin" : "/");
+        // All users go to homepage, admins can navigate to /admin from there
+        navigate("/");
       } else {
         const userData = await register(username, password);
         toast.success("Account created!", {
@@ -45,7 +42,7 @@ export default function LoginPage() {
             ? "You are the first user - admin access granted!"
             : `Welcome, ${userData.username}!`,
         });
-        navigate(userData.is_admin ? "/admin" : "/");
+        navigate("/");
       }
     } catch (error) {
       const message =
