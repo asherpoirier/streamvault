@@ -343,10 +343,24 @@ export default function HomePage() {
             url: proxyUrl,
           }, {
             enableWorker: true,
-            lazyLoadMaxDuration: 3 * 60,
+            enableStashBuffer: true,
+            stashInitialSize: 1024 * 1024, // 1MB initial buffer
+            lazyLoad: false,
+            lazyLoadMaxDuration: 5 * 60,
+            lazyLoadRecoverDuration: 30,
+            deferLoadAfterSourceOpen: false,
+            autoCleanupSourceBuffer: true,
+            autoCleanupMaxBackwardDuration: 30,
+            autoCleanupMinBackwardDuration: 15,
+            fixAudioTimestampGap: true,
+            accurateSeek: false,
             seekType: 'range',
+            reuseRedirectedURL: true,
             liveBufferLatencyChasing: true,
+            liveBufferLatencyMaxLatency: 1.5,
+            liveBufferLatencyMinRemain: 0.3,
             liveSync: true,
+            liveSyncTargetLatency: 2.0,
           });
           
           mpegtsRef.current = player;
