@@ -237,9 +237,13 @@ export default function HomePage() {
       mpegtsRef.current = null;
     }
 
-    // Check file type first - before needing video ref
-    const isHLS = originalUrl.toLowerCase().includes('.m3u8') || originalUrl.toLowerCase().includes('.m3u');
-    const isTS = originalUrl.toLowerCase().endsWith('.ts') || originalUrl.toLowerCase().includes('.ts?');
+    // Check file type - be more flexible with detection
+    const urlLower = originalUrl.toLowerCase();
+    const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist') || urlLower.includes('hls');
+    const hasExtension = /\.[a-z0-9]{2,4}(\?|$)/i.test(originalUrl);
+    const isTS = urlLower.endsWith('.ts') || urlLower.includes('.ts?');
+    // If no recognized extension, assume it's MPEG-TS (most common for IPTV streams)
+    const assumeTS = !isHLS && !hasExtension;
     
     // Need video ref for playable formats
     const video = videoRef.current;
