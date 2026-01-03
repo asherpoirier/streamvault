@@ -267,19 +267,46 @@ export default function HomePage() {
           enableWorker: true,
           lazyLoadMaxDuration: 3 * 60,
           seekType: 'range',
+          liveBufferLatencyChasing: true,
+          liveSync: true,
         });
         
         mpegtsRef.current = player;
         player.attachMediaElement(video);
         player.load();
         
+        // Track if we've received data
+        let hasReceivedData = false;
+        
         player.on(mpegts.Events.LOADING_COMPLETE, () => {
+          console.log("MPEGTS: Loading complete");
           setPlayerLoading(false);
         });
         
         player.on(mpegts.Events.METADATA_ARRIVED, () => {
+          console.log("MPEGTS: Metadata arrived");
+          hasReceivedData = true;
           setPlayerLoading(false);
           video.play().catch(e => console.log("Autoplay prevented:", e));
+        });
+        
+        player.on(mpegts.Events.MEDIA_INFO, (info) => {
+          console.log("MPEGTS: Media info received", info);
+          hasReceivedData = true;
+          setPlayerLoading(false);
+          video.play().catch(e => console.log("Autoplay prevented:", e));
+        });
+        
+        player.on(mpegts.Events.STATISTICS_INFO, (stats) => {
+          if (!hasReceivedData && stats.totalReceive > 0) {
+            console.log("MPEGTS: Receiving data, bytes:", stats.totalReceive);
+            hasReceivedData = true;
+            setPlayerLoading(false);
+            // Try to play after receiving data
+            setTimeout(() => {
+              video.play().catch(e => console.log("Autoplay prevented:", e));
+            }, 500);
+          }
         });
         
         player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
@@ -292,10 +319,11 @@ export default function HomePage() {
           }
         });
         
-        // Also try to play after a short delay
+        // Try to play after a short delay regardless
         setTimeout(() => {
+          setPlayerLoading(false);
           video.play().catch(e => console.log("Autoplay prevented:", e));
-        }, 1000);
+        }, 3000);
         
       } else {
         setPlayerLoading(false);
