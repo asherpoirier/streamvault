@@ -329,9 +329,59 @@ export default function HomePage() {
           setPlayerError("Your browser doesn't support HLS playback. Try using Chrome, Firefox, or Safari.");
         }
       } else {
-        // For non-HLS streams (MPEG-TS, etc), try direct playback via proxy
-        console.log("Trying direct stream via proxy:", proxyUrl);
-        video.src = proxyUrl;
+        // For non-HLS streams (MPEG-TS, etc), use mpegts.js
+        console.log("Using mpegts.js for stream:", proxyUrl);
+        
+        if (mpegts.isSupported()) {
+          const player = mpegts.createPlayer({
+            type: 'mpegts',
+            isLive: true,
+            url: proxyUrl,
+          }, {
+            enableWorker: true,
+            lazyLoadMaxDuration: 3 * 60,
+            seekType: 'range',
+            liveBufferLatencyChasing: true,
+            liveSync: true,
+          });
+          
+          mpegtsRef.current = player;
+          player.attachMediaElement(video);
+          player.load();
+          
+          player.on(mpegts.Events.LOADING_COMPLETE, () => {
+            console.log("MPEGTS: Loading complete");
+            setPlayerLoading(false);
+          });
+          
+          player.on(mpegts.Events.METADATA_ARRIVED, () => {
+            console.log("MPEGTS: Metadata arrived");
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          });
+          
+          player.on(mpegts.Events.MEDIA_INFO, (info) => {
+            console.log("MPEGTS: Media info received", info);
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          });
+          
+          player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+            console.error("MPEGTS Error:", errorType, errorDetail, errorInfo);
+            setPlayerLoading(false);
+            setPlayerError("Failed to load stream. Try copying the URL and using VLC.");
+          });
+          
+          // Try to play after delay
+          setTimeout(() => {
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          }, 3000);
+          
+        } else {
+          // Fallback to direct video element
+          console.log("mpegts.js not supported, trying direct playback");
+          video.src = proxyUrl;
         
         video.onloadedmetadata = () => {
           console.log("Video: Metadata loaded");
