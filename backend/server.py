@@ -179,15 +179,15 @@ async def fetch_and_parse_m3u8(url: str) -> List[Channel]:
 # ============ Auth Routes ============
 
 @api_router.post("/auth/register", response_model=TokenResponse)
-async def register(user_data: UserCreate):
+async def register(user_data: UserCreate, admin: dict = Depends(get_admin_user)):
+    """Register a new user (admin only)"""
     # Check if user exists
     existing_user = await db.users.find_one({"username": user_data.username})
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # Check if this is the first user (make them admin)
-    user_count = await db.users.count_documents({})
-    is_admin = user_count == 0
+    # New users created by admin are never admin themselves
+    is_admin = False
     
     # Create user
     user_id = str(uuid.uuid4())
@@ -203,14 +203,46 @@ async def register(user_data: UserCreate):
     
     await db.users.insert_one(user_doc)
     
-    token = create_access_token(user_id, user_data.username, is_admin)
+    # Return the created user info (no token since admin is creating)
+    return TokenResponse(
+        access_token="",  # No token for admin-created users
+        user=UserResponse(
+            id=user_id,
+            username=user_data.username,
+            is_admin=is_admin,
+            created_at=now
+        )
+    )
+
+@api_router.post("/auth/setup", response_model=TokenResponse)
+async def setup_admin(user_data: UserCreate):
+    """Setup first admin user (only works if no users exist)"""
+    user_count = await db.users.count_documents({})
+    if user_count > 0:
+        raise HTTPException(status_code=403, detail="Setup already completed. Contact admin for access.")
+    
+    # Create first admin user
+    user_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    
+    user_doc = {
+        "id": user_id,
+        "username": user_data.username,
+        "password_hash": hash_password(user_data.password),
+        "is_admin": True,
+        "created_at": now
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    token = create_access_token(user_id, user_data.username, True)
     
     return TokenResponse(
         access_token=token,
         user=UserResponse(
             id=user_id,
             username=user_data.username,
-            is_admin=is_admin,
+            is_admin=True,
             created_at=now
         )
     )

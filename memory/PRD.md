@@ -9,13 +9,15 @@ Create a webapp that takes a provider M3U8 list and displays the channels. The a
 3. Display/copy stream URL with VLC open option (vlc:// protocol)
 4. Dark theme (modern streaming look)
 5. Playlists grouped by provider
+6. **Users must login to view channels/providers** (added)
 
 ## User Personas
 - **Admin**: Manages M3U8 playlist sources, adds/refreshes/deletes providers
-- **Viewer**: Browses channels, searches, filters by provider, copies URLs or opens in VLC
+- **User**: Must login to browse channels, search, filter by provider, copy URLs or open in VLC
 
 ## Core Requirements
-- JWT authentication for admin access
+- JWT authentication for all users (required to view content)
+- Admin-only playlist management
 - M3U8 URL parsing and channel extraction
 - Channel search and provider filtering
 - Copy stream URL functionality
@@ -30,9 +32,10 @@ Create a webapp that takes a provider M3U8 list and displays the channels. The a
 ## What's Been Implemented (January 2, 2026)
 - [x] JWT authentication (register/login)
 - [x] First user auto-admin assignment
+- [x] **Login required to view channels/providers**
 - [x] M3U8 URL parsing with channel extraction
 - [x] Admin dashboard for playlist CRUD
-- [x] Public channel browser with search
+- [x] Protected channel browser with search
 - [x] Provider filter buttons
 - [x] Copy URL to clipboard
 - [x] Open in VLC (vlc:// protocol)
@@ -45,12 +48,12 @@ Create a webapp that takes a provider M3U8 list and displays the channels. The a
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login and get JWT token
 - `GET /api/auth/me` - Get current user info
-- `POST /api/playlists` - Add new playlist (admin)
-- `GET /api/playlists` - List all playlists (admin)
-- `PUT /api/playlists/{id}/refresh` - Refresh playlist channels
-- `DELETE /api/playlists/{id}` - Delete playlist
-- `GET /api/channels` - Public channel list with search/filter
-- `GET /api/providers` - List all providers
+- `POST /api/playlists` - Add new playlist (admin only)
+- `GET /api/playlists` - List all playlists (admin only)
+- `PUT /api/playlists/{id}/refresh` - Refresh playlist channels (admin only)
+- `DELETE /api/playlists/{id}` - Delete playlist (admin only)
+- `GET /api/channels` - Channel list with search/filter (requires login)
+- `GET /api/providers` - List all providers (requires login)
 
 ## Prioritized Backlog
 ### P0 (Critical)
