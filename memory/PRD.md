@@ -9,7 +9,8 @@ Create a webapp that takes a provider M3U8 list and displays the channels. The a
 3. Display/copy stream URL with VLC open option (vlc:// protocol)
 4. Dark theme (modern streaming look)
 5. Playlists grouped by provider
-6. **Users must login to view channels/providers** (added)
+6. **Users must login to view channels/providers**
+7. **Only admin can create user accounts** (no self-registration)
 
 ## User Personas
 - **Admin**: Manages M3U8 playlist sources, adds/refreshes/deletes providers
@@ -30,11 +31,13 @@ Create a webapp that takes a provider M3U8 list and displays the channels. The a
 - **Auth**: JWT tokens with bcrypt password hashing
 
 ## What's Been Implemented (January 2, 2026)
-- [x] JWT authentication (register/login)
-- [x] First user auto-admin assignment
+- [x] JWT authentication (login only - no self-registration)
+- [x] First admin setup via /api/auth/setup endpoint
+- [x] **Admin-only user creation** (Manage Users tab)
 - [x] **Login required to view channels/providers**
 - [x] M3U8 URL parsing with channel extraction
 - [x] Admin dashboard for playlist CRUD
+- [x] Admin dashboard for user management (create/delete users)
 - [x] Protected channel browser with search
 - [x] Provider filter buttons
 - [x] Copy URL to clipboard
@@ -43,6 +46,7 @@ Create a webapp that takes a provider M3U8 list and displays the channels. The a
 - [x] Dark theme with neon accents
 - [x] Session persistence across reloads
 - [x] Playlist refresh functionality
+- [x] Removed Emergent watermark
 
 ## API Endpoints
 - `POST /api/auth/register` - Register new user

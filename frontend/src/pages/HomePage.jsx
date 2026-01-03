@@ -1,15 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, Navigate } from "react-router-dom";
 import axios from "axios";
 import { API, useAuth } from "@/App";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search,
   Copy,
-  ExternalLink,
   Tv,
   Radio,
   Settings,
@@ -26,62 +24,75 @@ export default function HomePage() {
   const [providers, setProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
+  // Fetch providers on load (lightweight - no channel data)
   useEffect(() => {
     if (token) {
-      fetchData();
-    } else {
-      setLoading(false);
+      fetchProviders();
     }
   }, [token]);
 
-  const fetchData = async () => {
+  const fetchProviders = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [channelsRes, providersRes] = await Promise.all([
-        axios.get(`${API}/channels`, { headers }),
-        axios.get(`${API}/providers`, { headers }),
-      ]);
-      setChannels(channelsRes.data);
-      setProviders(providersRes.data);
+      const response = await axios.get(`${API}/providers`, { headers });
+      setProviders(response.data);
     } catch (error) {
-      console.error("Failed to fetch data:", error);
+      console.error("Failed to fetch providers:", error);
+      if (error.response?.status === 401) {
+        logout();
+      }
+    }
+  };
+
+  // Debounced search function
+  const searchChannels = useCallback(async (query, provider) => {
+    if (!query && !provider) {
+      setChannels([]);
+      setHasSearched(false);
+      return;
+    }
+
+    setLoading(true);
+    setHasSearched(true);
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const params = new URLSearchParams();
+      if (query) params.append("search", query);
+      if (provider) params.append("provider", provider);
+
+      const response = await axios.get(`${API}/channels?${params.toString()}`, { headers });
+      setChannels(response.data);
+    } catch (error) {
+      console.error("Failed to search channels:", error);
       if (error.response?.status === 401) {
         logout();
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, logout]);
 
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.length >= 2 || selectedProvider) {
+        searchChannels(searchQuery, selectedProvider);
+      } else if (searchQuery.length === 0 && !selectedProvider) {
+        setChannels([]);
+        setHasSearched(false);
+      }
+    }, 300);
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  const filteredChannels = channels.filter((channel) => {
-    const matchesSearch =
-      !searchQuery ||
-      channel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (channel.group || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesProvider =
-      !selectedProvider || channel.provider_name === selectedProvider;
-    return matchesSearch && matchesProvider;
-  });
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, selectedProvider, searchChannels]);
 
   // Group channels by provider
-  const groupedChannels = filteredChannels.reduce((acc, channel) => {
+  const groupedChannels = channels.reduce((acc, channel) => {
     const provider = channel.provider_name;
     if (!acc[provider]) {
       acc[provider] = [];
@@ -102,15 +113,28 @@ export default function HomePage() {
   };
 
   const openInVLC = (url) => {
-    // VLC protocol handler
     window.location.href = `vlc://${url}`;
     toast.info("Opening in VLC...", {
       description: "Make sure VLC is installed on your system",
     });
   };
 
-  const totalChannels = channels.length;
+  const totalChannels = providers.reduce((acc, p) => acc + p.channel_count, 0);
   const totalProviders = providers.length;
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,34 +152,32 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <>
-                {user.is_admin && (
-                  <Link to="/admin">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-slate-400 hover:text-white hover:bg-white/5"
-                      data-testid="admin-dashboard-link"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Admin
-                    </Button>
-                  </Link>
-                )}
-                <span className="text-sm text-slate-400">
-                  {user.username}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={logout}
-                  className="text-slate-400 hover:text-white hover:bg-white/5"
-                  data-testid="logout-btn"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </Button>
-              </>
+              {user.is_admin && (
+                <Link to="/admin">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-white hover:bg-white/5"
+                    data-testid="admin-dashboard-link"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
+              )}
+              <span className="text-sm text-slate-400">
+                {user.username}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="text-slate-400 hover:text-white hover:bg-white/5"
+                data-testid="logout-btn"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
@@ -169,7 +191,7 @@ export default function HomePage() {
             <span className="text-primary">Command Center</span>
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-8 animate-fade-in stagger-1">
-            Browse and access channels from multiple IPTV providers in one place
+            Search channels from multiple IPTV providers in one place
           </p>
 
           {/* Stats */}
@@ -178,7 +200,7 @@ export default function HomePage() {
               <Tv className="w-5 h-5 text-cyan-400" />
               <span className="text-slate-300">
                 <span className="font-semibold text-white">{totalChannels}</span>{" "}
-                Channels
+                Channels Available
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -196,13 +218,16 @@ export default function HomePage() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
               <Input
                 type="text"
-                placeholder="Search channels by name or category..."
+                placeholder="Search channels (min. 2 characters)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-14 pl-12 pr-4 text-lg bg-slate-900/80 border-white/10 focus:border-primary/50 placeholder:text-slate-600"
                 data-testid="channel-search-input"
               />
             </div>
+            <p className="text-sm text-slate-500 mt-2">
+              Type to search across all providers, or filter by provider below
+            </p>
           </div>
         </div>
       </section>
@@ -211,7 +236,7 @@ export default function HomePage() {
       <section className="py-6 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 overflow-x-auto pb-2">
-            <span className="text-sm text-slate-500 shrink-0">Filter by:</span>
+            <span className="text-sm text-slate-500 shrink-0">Filter by provider:</span>
             <Button
               variant={selectedProvider === "" ? "default" : "outline"}
               size="sm"
@@ -257,13 +282,18 @@ export default function HomePage() {
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-24 skeleton rounded-lg"
-                ></div>
-              ))}
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : !hasSearched ? (
+            <div className="text-center py-16">
+              <Search className="w-16 h-16 mx-auto text-slate-600 mb-4" />
+              <h3 className="text-xl font-medium text-slate-400 mb-2">
+                Search for channels
+              </h3>
+              <p className="text-slate-500">
+                Enter at least 2 characters to search, or select a provider to browse
+              </p>
             </div>
           ) : Object.keys(groupedChannels).length === 0 ? (
             <div className="text-center py-16">
@@ -272,13 +302,17 @@ export default function HomePage() {
                 No channels found
               </h3>
               <p className="text-slate-500">
-                {channels.length === 0
-                  ? "No playlists have been added yet. Ask an admin to add some!"
-                  : "Try adjusting your search or filter"}
+                Try a different search term or select another provider
               </p>
             </div>
           ) : (
             <div className="space-y-10">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-400">
+                  Found <span className="text-white font-medium">{channels.length}</span> channels
+                </p>
+              </div>
+              
               {Object.entries(groupedChannels).map(
                 ([providerName, providerChannels]) => (
                   <div key={providerName} className="animate-fade-in">
