@@ -1,16 +1,15 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/App";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Radio, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Radio, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, register, user } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const { login, user } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,26 +27,15 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const userData = await login(username, password);
-        toast.success("Welcome back!", {
-          description: `Logged in as ${userData.username}`,
-        });
-        // All users go to homepage, admins can navigate to /admin from there
-        navigate("/");
-      } else {
-        const userData = await register(username, password);
-        toast.success("Account created!", {
-          description: userData.is_admin
-            ? "You are the first user - admin access granted!"
-            : `Welcome, ${userData.username}!`,
-        });
-        navigate("/");
-      }
+      const userData = await login(username, password);
+      toast.success("Welcome back!", {
+        description: `Logged in as ${userData.username}`,
+      });
+      navigate("/");
     } catch (error) {
       const message =
         error.response?.data?.detail || "Authentication failed. Please try again.";
-      toast.error(isLogin ? "Login failed" : "Registration failed", {
+      toast.error("Login failed", {
         description: message,
       });
     } finally {
@@ -111,16 +99,6 @@ export default function LoginPage() {
       {/* Right side - Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-16 bg-background">
         <div className="max-w-md w-full mx-auto">
-          {/* Back to home link */}
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 mb-8 transition-colors"
-            data-testid="back-home-link"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to channels
-          </Link>
-
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="p-2 rounded-lg bg-primary/20">
@@ -131,12 +109,10 @@ export default function LoginPage() {
 
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              {isLogin ? "Welcome back" : "Create account"}
+              Welcome back
             </h1>
             <p className="text-slate-400">
-              {isLogin
-                ? "Sign in to browse channels and providers"
-                : "Create an account to access the channel library"}
+              Sign in to browse channels and providers
             </p>
           </div>
 
@@ -196,27 +172,18 @@ export default function LoginPage() {
               {loading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  {isLogin ? "Signing in..." : "Creating account..."}
+                  Signing in...
                 </div>
-              ) : isLogin ? (
-                "Sign in"
               ) : (
-                "Create account"
+                "Sign in"
               )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-slate-400 hover:text-primary transition-colors"
-              data-testid="toggle-auth-mode"
-            >
-              {isLogin
-                ? "Don't have an account? Register"
-                : "Already have an account? Sign in"}
-            </button>
+          <div className="mt-8 text-center">
+            <p className="text-sm text-slate-500">
+              Need an account? Contact your administrator.
+            </p>
           </div>
         </div>
       </div>
