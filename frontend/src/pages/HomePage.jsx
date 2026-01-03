@@ -1,10 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, Navigate } from "react-router-dom";
 import axios from "axios";
+import Hls from "hls.js";
 import { API, useAuth } from "@/App";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Search,
   Copy,
@@ -13,8 +20,13 @@ import {
   Settings,
   LogOut,
   Check,
-  Monitor,
+  Play,
   Layers,
+  X,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,6 +39,15 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  
+  // Video player state
+  const [playerOpen, setPlayerOpen] = useState(false);
+  const [currentChannel, setCurrentChannel] = useState(null);
+  const [playerLoading, setPlayerLoading] = useState(false);
+  const [playerError, setPlayerError] = useState(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
 
   // Fetch providers on load (lightweight - no channel data)
   useEffect(() => {
@@ -34,6 +55,15 @@ export default function HomePage() {
       fetchProviders();
     }
   }, [token]);
+
+  // Cleanup HLS on unmount
+  useEffect(() => {
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
+    };
+  }, []);
 
   const fetchProviders = async () => {
     try {
@@ -112,28 +142,104 @@ export default function HomePage() {
     }
   };
 
-  const openInVLC = (url, channelName) => {
-    // Create a .m3u file content
-    const m3uContent = `#EXTM3U\n#EXTINF:-1,${channelName}\n${url}`;
-    
-    // Create a blob and download it
-    const blob = new Blob([m3uContent], { type: 'audio/x-mpegurl' });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    
-    // Create a temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = `${channelName.replace(/[^a-zA-Z0-9]/g, '_')}.m3u`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up the blob URL
-    window.URL.revokeObjectURL(downloadUrl);
-    
-    toast.success("M3U file downloaded!", {
-      description: "Open the file with VLC or your preferred media player",
-    });
+  const openPlayer = (channel) => {
+    setCurrentChannel(channel);
+    setPlayerOpen(true);
+    setPlayerLoading(true);
+    setPlayerError(null);
+  };
+
+  const closePlayer = () => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    setPlayerOpen(false);
+    setCurrentChannel(null);
+    setPlayerError(null);
+  };
+
+  // Initialize video player when dialog opens
+  useEffect(() => {
+    if (playerOpen && currentChannel && videoRef.current) {
+      const video = videoRef.current;
+      const url = currentChannel.url;
+
+      // Cleanup previous HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
+      // Check if it's an HLS stream
+      if (url.includes('.m3u8') || url.includes('.m3u')) {
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+          });
+          hlsRef.current = hls;
+
+          hls.loadSource(url);
+          hls.attachMedia(video);
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          });
+
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+              setPlayerLoading(false);
+              setPlayerError("Failed to load stream. The stream may be offline or unavailable.");
+              console.error("HLS Error:", data);
+            }
+          });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          // Safari native HLS support
+          video.src = url;
+          video.addEventListener('loadedmetadata', () => {
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          });
+          video.addEventListener('error', () => {
+            setPlayerLoading(false);
+            setPlayerError("Failed to load stream.");
+          });
+        } else {
+          setPlayerLoading(false);
+          setPlayerError("HLS is not supported in this browser.");
+        }
+      } else {
+        // Direct video URL
+        video.src = url;
+        video.addEventListener('loadedmetadata', () => {
+          setPlayerLoading(false);
+          video.play().catch(e => console.log("Autoplay prevented:", e));
+        });
+        video.addEventListener('error', () => {
+          setPlayerLoading(false);
+          setPlayerError("Failed to load video stream.");
+        });
+      }
+    }
+  }, [playerOpen, currentChannel]);
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      } else if (videoRef.current.webkitRequestFullscreen) {
+        videoRef.current.webkitRequestFullscreen();
+      }
+    }
   };
 
   const totalChannels = providers.reduce((acc, p) => acc + p.channel_count, 0);
@@ -399,12 +505,12 @@ export default function HomePage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 hover:bg-white/10"
-                                onClick={() => openInVLC(channel.url, channel.name)}
-                                title="Download M3U for VLC"
-                                data-testid={`open-vlc-btn-${idx}`}
+                                className="h-8 w-8 hover:bg-primary/20"
+                                onClick={() => openPlayer(channel)}
+                                title="Play in browser"
+                                data-testid={`play-btn-${idx}`}
                               >
-                                <Monitor className="w-4 h-4 text-slate-400" />
+                                <Play className="w-4 h-4 text-primary" />
                               </Button>
                             </div>
                           </div>
@@ -423,6 +529,95 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* Video Player Modal */}
+      <Dialog open={playerOpen} onOpenChange={(open) => !open && closePlayer()}>
+        <DialogContent className="max-w-4xl bg-slate-950 border-white/10 p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="text-foreground flex items-center gap-3">
+              {currentChannel?.logo && (
+                <img
+                  src={currentChannel.logo}
+                  alt=""
+                  className="w-8 h-8 rounded object-cover"
+                  onError={(e) => e.target.style.display = "none"}
+                />
+              )}
+              <span className="truncate">{currentChannel?.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="relative bg-black aspect-video">
+            {playerLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-2" />
+                  <p className="text-slate-400">Loading stream...</p>
+                </div>
+              </div>
+            )}
+            
+            {playerError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black">
+                <div className="text-center p-8">
+                  <Tv className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <p className="text-slate-400 mb-4">{playerError}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => copyToClipboard(currentChannel?.url, currentChannel?.name)}
+                    className="bg-transparent border-white/10"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy URL to play in VLC
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <video
+              ref={videoRef}
+              className="w-full h-full"
+              controls
+              autoPlay
+              playsInline
+            />
+          </div>
+          
+          <div className="p-4 flex items-center justify-between border-t border-white/5">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMute}
+                className="h-8 w-8 hover:bg-white/10"
+              >
+                {isMuted ? (
+                  <VolumeX className="w-4 h-4 text-slate-400" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-slate-400" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleFullscreen}
+                className="h-8 w-8 hover:bg-white/10"
+              >
+                <Maximize className="w-4 h-4 text-slate-400" />
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(currentChannel?.url, currentChannel?.name)}
+              className="bg-transparent border-white/10"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copy URL
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="py-8 border-t border-white/5">
