@@ -4,10 +4,10 @@
 # StreamVault - One-Line Installer Bootstrap
 # 
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/streamvault/main/bootstrap.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/asherpoirier/streamvault/main/bootstrap.sh | sudo bash
 #
 # Or with wget:
-#   wget -qO- https://raw.githubusercontent.com/YOUR_USERNAME/streamvault/main/bootstrap.sh | sudo bash
+#   wget -qO- https://raw.githubusercontent.com/asherpoirier/streamvault/main/bootstrap.sh | sudo bash
 #===============================================================================
 
 set -e
