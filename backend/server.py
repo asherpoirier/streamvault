@@ -311,11 +311,15 @@ async def delete_playlist(playlist_id: str, admin: dict = Depends(get_admin_user
         raise HTTPException(status_code=404, detail="Playlist not found")
     return {"message": "Playlist deleted"}
 
-# ============ Public Routes ============
+# ============ Protected Routes (Logged-in Users) ============
 
 @api_router.get("/channels", response_model=List[ChannelWithProvider])
-async def get_all_channels(search: Optional[str] = None, provider: Optional[str] = None):
-    """Get all channels from all playlists, optionally filtered"""
+async def get_all_channels(
+    search: Optional[str] = None, 
+    provider: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all channels from all playlists, optionally filtered (requires login)"""
     playlists = await db.playlists.find({}, {"_id": 0}).to_list(100)
     
     all_channels = []
@@ -346,8 +350,8 @@ async def get_all_channels(search: Optional[str] = None, provider: Optional[str]
     return all_channels
 
 @api_router.get("/providers")
-async def get_providers():
-    """Get list of all providers with channel counts"""
+async def get_providers(current_user: dict = Depends(get_current_user)):
+    """Get list of all providers with channel counts (requires login)"""
     playlists = await db.playlists.find({}, {"_id": 0, "channels": 0}).to_list(100)
     return [{"name": p["provider_name"], "channel_count": p["channel_count"], "id": p["id"]} for p in playlists]
 

@@ -138,8 +138,8 @@ export default function LoginPage() {
             </h1>
             <p className="text-slate-400">
               {isLogin
-                ? "Sign in to access the admin dashboard"
-                : "First user becomes admin automatically"}
+                ? "Sign in to browse channels and providers"
+                : "Create an account to access the channel library"}
             </p>
           </div>
 

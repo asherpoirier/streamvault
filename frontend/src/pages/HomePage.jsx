@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import axios from "axios";
 import { API, useAuth } from "@/App";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 
 export default function HomePage() {
-  const { user, logout } = useAuth();
+  const { user, token, logout, loading: authLoading } = useAuth();
   const [channels, setChannels] = useState([]);
   const [providers, setProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,23 +30,45 @@ export default function HomePage() {
   const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (token) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [token]);
 
   const fetchData = async () => {
     try {
+      const headers = { Authorization: `Bearer ${token}` };
       const [channelsRes, providersRes] = await Promise.all([
-        axios.get(`${API}/channels`),
-        axios.get(`${API}/providers`),
+        axios.get(`${API}/channels`, { headers }),
+        axios.get(`${API}/providers`, { headers }),
       ]);
       setChannels(channelsRes.data);
       setProviders(providersRes.data);
     } catch (error) {
       console.error("Failed to fetch data:", error);
+      if (error.response?.status === 401) {
+        logout();
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   const filteredChannels = channels.filter((channel) => {
     const matchesSearch =
@@ -106,43 +128,34 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center gap-4">
-              {user ? (
-                <>
-                  {user.is_admin && (
-                    <Link to="/admin">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-400 hover:text-white hover:bg-white/5"
-                        data-testid="admin-dashboard-link"
-                      >
-                        <Settings className="w-4 h-4 mr-2" />
-                        Admin
-                      </Button>
-                    </Link>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={logout}
-                    className="text-slate-400 hover:text-white hover:bg-white/5"
-                    data-testid="logout-btn"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <Link to="/login">
-                  <Button
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 neon-glow-hover"
-                    data-testid="login-link"
-                  >
-                    Admin Login
-                  </Button>
-                </Link>
-              )}
+              <>
+                {user.is_admin && (
+                  <Link to="/admin">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-400 hover:text-white hover:bg-white/5"
+                      data-testid="admin-dashboard-link"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
+                <span className="text-sm text-slate-400">
+                  {user.username}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={logout}
+                  className="text-slate-400 hover:text-white hover:bg-white/5"
+                  data-testid="logout-btn"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </>
             </div>
           </div>
         </div>
