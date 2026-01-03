@@ -193,18 +193,20 @@ export default function HomePage() {
       setPlayerLoading(true);
       setPlayerError(null);
 
-      // Use proxy URL for the stream - pass API base for URL rewriting
-      const apiBase = encodeURIComponent(API);
-      const proxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}`;
-
-      // Check if it's an HLS stream
-      if (originalUrl.includes('.m3u8') || originalUrl.includes('.m3u')) {
+      // Check file type
+      const isHLS = originalUrl.includes('.m3u8') || originalUrl.includes('.m3u');
+      const isTS = originalUrl.includes('.ts');
+      
+      if (isHLS) {
+        // HLS stream - use proxy with URL rewriting
+        const apiBase = encodeURIComponent(API);
+        const proxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}`;
+        
         if (Hls.isSupported()) {
           const hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
             xhrSetup: function(xhr, url) {
-              // Add auth token to all proxy requests
               if (url.includes('/api/proxy/')) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
               }
@@ -224,26 +226,10 @@ export default function HomePage() {
             console.error("HLS Error:", data);
             if (data.fatal) {
               setPlayerLoading(false);
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                setPlayerError("Network error: Failed to load the stream. The stream may be offline or unavailable.");
-              } else {
-                setPlayerError("Failed to load stream. The stream may be offline or in an unsupported format.");
-              }
+              setPlayerError("Failed to load HLS stream. The stream may be offline.");
             }
           });
-
-          // Timeout for streams that hang
-          const timeout = setTimeout(() => {
-            if (playerLoading) {
-              setPlayerLoading(false);
-              setPlayerError("Stream is taking too long to load. It may be offline or unavailable.");
-            }
-          }, 20000);
-
-          return () => clearTimeout(timeout);
-
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          // Safari native HLS support
           video.src = proxyUrl;
           video.addEventListener('loadedmetadata', () => {
             setPlayerLoading(false);
@@ -253,23 +239,48 @@ export default function HomePage() {
             setPlayerLoading(false);
             setPlayerError("Failed to load stream.");
           });
-        } else {
-          setPlayerLoading(false);
-          setPlayerError("HLS is not supported in this browser.");
         }
       } else {
-        // Direct video URL - also proxy it
-        const directProxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
-        video.src = directProxyUrl;
-        video.addEventListener('loadedmetadata', () => {
+        // Direct stream (TS, MP4, etc) - proxy it directly
+        const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}`;
+        
+        video.src = proxyUrl;
+        
+        const onLoadedMetadata = () => {
           setPlayerLoading(false);
           video.play().catch(e => console.log("Autoplay prevented:", e));
-        });
-        video.addEventListener('error', () => {
+        };
+        
+        const onError = () => {
           setPlayerLoading(false);
-          setPlayerError("Failed to load video.");
-        });
+          setPlayerError("Failed to load stream. The stream may be offline or in an unsupported format.");
+        };
+
+        const onCanPlay = () => {
+          setPlayerLoading(false);
+        };
+        
+        video.addEventListener('loadedmetadata', onLoadedMetadata);
+        video.addEventListener('canplay', onCanPlay);
+        video.addEventListener('error', onError);
+        
+        // Try to load
+        video.load();
+        
+        return () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          video.removeEventListener('canplay', onCanPlay);
+          video.removeEventListener('error', onError);
+        };
       }
+
+      // Timeout for streams that hang
+      const timeout = setTimeout(() => {
+        setPlayerLoading(false);
+        setPlayerError("Stream is taking too long to load. It may be offline or unavailable.");
+      }, 20000);
+
+      return () => clearTimeout(timeout);
     }
   }, [playerOpen, currentChannel, token]);
 
