@@ -427,6 +427,10 @@ export default function HomePage() {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      if (mpegtsRef.current) {
+        mpegtsRef.current.destroy();
+        mpegtsRef.current = null;
+      }
     };
   }, [playerOpen, currentChannel, token]);
 
