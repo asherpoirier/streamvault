@@ -180,29 +180,33 @@ export default function HomePage() {
 
   // Initialize video player when dialog opens
   useEffect(() => {
-    if (playerOpen && currentChannel && videoRef.current) {
-      const video = videoRef.current;
-      const originalUrl = currentChannel.url;
+    if (!playerOpen || !currentChannel) return;
+    
+    const originalUrl = currentChannel.url;
 
-      // Cleanup previous HLS instance
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
+    // Cleanup previous HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
 
-      setPlayerLoading(true);
-      setPlayerError(null);
+    // Check file type first - before needing video ref
+    const isHLS = originalUrl.toLowerCase().includes('.m3u8') || originalUrl.toLowerCase().includes('.m3u');
+    const isTS = originalUrl.toLowerCase().endsWith('.ts') || originalUrl.toLowerCase().includes('.ts?');
+    
+    // .ts files can't be played directly in browser
+    if (isTS && !isHLS) {
+      setPlayerLoading(false);
+      setPlayerError("This stream uses MPEG-TS format (.ts) which browsers cannot play directly. Click 'Copy Stream URL' below and paste it in VLC Media Player (Media → Open Network Stream).");
+      return;
+    }
+    
+    // Need video ref for playable formats
+    const video = videoRef.current;
+    if (!video) return;
 
-      // Check file type
-      const isHLS = originalUrl.toLowerCase().includes('.m3u8') || originalUrl.toLowerCase().includes('.m3u');
-      const isTS = originalUrl.toLowerCase().endsWith('.ts') || originalUrl.toLowerCase().includes('.ts?');
-      
-      // .ts files can't be played directly in browser
-      if (isTS && !isHLS) {
-        setPlayerLoading(false);
-        setPlayerError("This stream uses MPEG-TS format (.ts) which browsers cannot play directly. Click 'Copy Stream URL' below and paste it in VLC Media Player (Media → Open Network Stream).");
-        return;
-      }
+    setPlayerLoading(true);
+    setPlayerError(null);
       
       if (isHLS) {
         // HLS stream - use proxy with URL rewriting
