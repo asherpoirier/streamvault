@@ -193,8 +193,9 @@ export default function HomePage() {
       setPlayerLoading(true);
       setPlayerError(null);
 
-      // Use proxy URL for the stream
-      const proxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}`;
+      // Use proxy URL for the stream - pass API base for URL rewriting
+      const apiBase = encodeURIComponent(API);
+      const proxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}`;
 
       // Check if it's an HLS stream
       if (originalUrl.includes('.m3u8') || originalUrl.includes('.m3u')) {
@@ -204,11 +205,7 @@ export default function HomePage() {
             lowLatencyMode: true,
             xhrSetup: function(xhr, url) {
               // Add auth token to all proxy requests
-              xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-              
-              // If URL is relative (from rewritten m3u8), make it absolute
-              if (url.startsWith('proxy/')) {
-                xhr.open('GET', `${API}/${url}`, true);
+              if (url.includes('/api/proxy/')) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
               }
             },
