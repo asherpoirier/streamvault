@@ -382,25 +382,26 @@ export default function HomePage() {
           // Fallback to direct video element
           console.log("mpegts.js not supported, trying direct playback");
           video.src = proxyUrl;
-        
-        video.onloadedmetadata = () => {
-          console.log("Video: Metadata loaded");
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
-        };
-        
-        video.oncanplay = () => {
-          console.log("Video: Can play");
-          setPlayerLoading(false);
-        };
-        
-        video.onerror = (e) => {
-          console.error("Video error:", e);
-          setPlayerLoading(false);
-          setPlayerError("Failed to load stream. This format may not be supported in your browser. Try copying the URL and using VLC.");
-        };
-        
-        video.load();
+          
+          video.onloadedmetadata = () => {
+            console.log("Video: Metadata loaded");
+            setPlayerLoading(false);
+            video.play().catch(e => console.log("Autoplay prevented:", e));
+          };
+          
+          video.oncanplay = () => {
+            console.log("Video: Can play");
+            setPlayerLoading(false);
+          };
+          
+          video.onerror = (e) => {
+            console.error("Video error:", e);
+            setPlayerLoading(false);
+            setPlayerError("Failed to load stream. This format may not be supported in your browser. Try copying the URL and using VLC.");
+          };
+          
+          video.load();
+        }
       }
     }, 200); // Delay to ensure DOM is ready
     
