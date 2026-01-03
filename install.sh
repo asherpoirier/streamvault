@@ -4,12 +4,9 @@
 # StreamVault - M3U8 Playlist Viewer
 # Automated Installer for Ubuntu 24.04
 # 
-# This script will install:
-# - Node.js 20.x
-# - Python 3.11+
-# - MongoDB 7.0
-# - Nginx
-# - All application dependencies
+# Usage:
+#   Interactive:    sudo ./install.sh
+#   Non-interactive: sudo ./install.sh --domain example.com --admin-user admin --admin-pass MyPassword123
 #===============================================================================
 
 set -e
@@ -30,7 +27,9 @@ ADMIN_USERNAME=""
 ADMIN_PASSWORD=""
 JWT_SECRET=$(openssl rand -hex 32)
 BACKEND_PORT=8001
-FRONTEND_PORT=3000
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 #===============================================================================
 # Helper Functions
@@ -63,6 +62,26 @@ log_step() {
     echo -e "\n${BLUE}==>${NC} $1"
 }
 
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --domain DOMAIN       Domain name or IP (default: localhost)"
+    echo "  --admin-user USER     Admin username (default: admin)"
+    echo "  --admin-pass PASS     Admin password (required, min 8 chars)"
+    echo "  --help                Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  Interactive mode:"
+    echo "    sudo ./install.sh"
+    echo ""
+    echo "  Non-interactive mode:"
+    echo "    sudo ./install.sh --domain myserver.com --admin-user admin --admin-pass MySecurePass123"
+    echo ""
+    echo "  One-liner install:"
+    echo "    curl -fsSL https://raw.githubusercontent.com/asherpoirier/streamvault/main/bootstrap.sh | sudo bash -s -- --domain myserver.com --admin-user admin --admin-pass MySecurePass123"
+}
+
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         log_error "This script must be run as root (use sudo)"
@@ -70,8 +89,66 @@ check_root() {
     fi
 }
 
+check_source_files() {
+    if [[ ! -d "$SCRIPT_DIR/backend" ]] || [[ ! -d "$SCRIPT_DIR/frontend" ]]; then
+        log_error "Source files not found!"
+        log_error "Expected 'backend' and 'frontend' directories in: $SCRIPT_DIR"
+        exit 1
+    fi
+    log_info "Source files found in $SCRIPT_DIR"
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --domain)
+                DOMAIN="$2"
+                shift 2
+                ;;
+            --admin-user)
+                ADMIN_USERNAME="$2"
+                shift 2
+                ;;
+            --admin-pass)
+                ADMIN_PASSWORD="$2"
+                shift 2
+                ;;
+            --help)
+                show_usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
 get_user_input() {
     log_step "Configuration"
+    
+    # Check if we have all required args for non-interactive mode
+    if [[ -n "$ADMIN_PASSWORD" ]]; then
+        # Non-interactive mode
+        [[ -z "$DOMAIN" ]] && DOMAIN="localhost"
+        [[ -z "$ADMIN_USERNAME" ]] && ADMIN_USERNAME="admin"
+        
+        log_info "Running in non-interactive mode"
+        log_info "  Domain: $DOMAIN"
+        log_info "  Admin Username: $ADMIN_USERNAME"
+        log_info "  App Directory: $APP_DIR"
+        return
+    fi
+    
+    # Interactive mode - check if stdin is a terminal
+    if [[ ! -t 0 ]]; then
+        log_error "Running non-interactively but missing required arguments!"
+        echo ""
+        show_usage
+        exit 1
+    fi
     
     # Get domain/IP
     read -p "Enter domain name or IP address (e.g., example.com or 192.168.1.100): " DOMAIN
@@ -81,10 +158,9 @@ get_user_input() {
     fi
     
     # Get admin credentials
-    read -p "Enter admin username: " ADMIN_USERNAME
+    read -p "Enter admin username [admin]: " ADMIN_USERNAME
     if [[ -z "$ADMIN_USERNAME" ]]; then
         ADMIN_USERNAME="admin"
-        log_warn "No username specified, using 'admin'"
     fi
     
     while true; do
@@ -106,6 +182,19 @@ get_user_input() {
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         log_info "Installation cancelled"
         exit 0
+    fi
+}
+
+validate_config() {
+    if [[ -z "$ADMIN_PASSWORD" ]]; then
+        log_error "Admin password is required!"
+        show_usage
+        exit 1
+    fi
+    
+    if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
+        log_error "Admin password must be at least 8 characters!"
+        exit 1
     fi
 }
 
@@ -135,20 +224,19 @@ install_system_dependencies() {
 install_nodejs() {
     log_step "Installing Node.js 20.x..."
     
-    # Check if Node.js is already installed
     if command -v node &> /dev/null; then
         NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
         if [[ $NODE_VERSION -ge 18 ]]; then
             log_info "Node.js $(node -v) already installed"
+            if ! command -v yarn &> /dev/null; then
+                npm install -g yarn
+            fi
             return
         fi
     fi
     
-    # Install Node.js 20.x
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt-get install -y nodejs
-    
-    # Install yarn globally
     npm install -g yarn
     
     log_info "Node.js $(node -v) and Yarn $(yarn -v) installed"
@@ -169,7 +257,6 @@ install_python() {
 install_mongodb() {
     log_step "Installing MongoDB 7.0..."
     
-    # Check if MongoDB is already installed
     if command -v mongod &> /dev/null; then
         log_info "MongoDB already installed"
         systemctl start mongod || true
@@ -177,22 +264,17 @@ install_mongodb() {
         return
     fi
     
-    # Import MongoDB GPG key
     curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
         gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
     
-    # Add MongoDB repository
     echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | \
         tee /etc/apt/sources.list.d/mongodb-org-7.0.list
     
     apt-get update
     apt-get install -y mongodb-org
     
-    # Start and enable MongoDB
     systemctl start mongod
     systemctl enable mongod
-    
-    # Wait for MongoDB to start
     sleep 3
     
     log_info "MongoDB installed and started"
@@ -202,7 +284,6 @@ install_nginx() {
     log_step "Installing Nginx..."
     
     apt-get install -y nginx
-    
     systemctl start nginx
     systemctl enable nginx
     
@@ -223,14 +304,15 @@ create_app_user() {
 setup_application() {
     log_step "Setting up application..."
     
-    # Create app directory
     mkdir -p $APP_DIR
     
-    # Copy application files
-    cp -r /app/backend $APP_DIR/
-    cp -r /app/frontend $APP_DIR/
+    log_info "Copying backend files..."
+    cp -r "$SCRIPT_DIR/backend" $APP_DIR/
     
-    # Create backend .env file
+    log_info "Copying frontend files..."
+    cp -r "$SCRIPT_DIR/frontend" $APP_DIR/
+    
+    # Backend .env
     cat > $APP_DIR/backend/.env << EOF
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=streamvault
@@ -241,7 +323,7 @@ EOF
     
     log_info "Backend environment configured"
     
-    # Setup Python virtual environment
+    # Python venv
     log_info "Setting up Python virtual environment..."
     cd $APP_DIR/backend
     python3 -m venv venv
@@ -252,11 +334,12 @@ EOF
     
     log_info "Python dependencies installed"
     
-    # Create frontend .env file
+    # Frontend .env
+    # Note: Don't include /api - nginx proxies /api/ to backend
     if [[ "$DOMAIN" == "localhost" ]]; then
-        BACKEND_URL="http://localhost/api"
+        BACKEND_URL="http://localhost"
     else
-        BACKEND_URL="http://$DOMAIN/api"
+        BACKEND_URL="http://$DOMAIN"
     fi
     
     cat > $APP_DIR/frontend/.env << EOF
@@ -273,7 +356,6 @@ EOF
     
     log_info "Frontend built successfully"
     
-    # Set ownership
     chown -R $APP_USER:$APP_USER $APP_DIR
     
     log_info "Application setup complete"
@@ -282,10 +364,8 @@ EOF
 create_admin_user() {
     log_step "Creating admin user..."
     
-    # Create a Python script to create the admin user
     cat > /tmp/create_admin.py << EOF
 import asyncio
-import os
 import sys
 sys.path.insert(0, '$APP_DIR/backend')
 
@@ -300,13 +380,11 @@ async def create_admin():
     client = AsyncIOMotorClient("mongodb://localhost:27017")
     db = client["streamvault"]
     
-    # Check if admin exists
     existing = await db.users.find_one({"username": "$ADMIN_USERNAME"})
     if existing:
         print("Admin user already exists")
         return
     
-    # Create admin user
     user = {
         "id": str(uuid4()),
         "username": "$ADMIN_USERNAME",
@@ -335,7 +413,6 @@ EOF
 create_systemd_services() {
     log_step "Creating systemd services..."
     
-    # Backend service
     cat > /etc/systemd/system/streamvault-backend.service << EOF
 [Unit]
 Description=StreamVault Backend API
@@ -356,9 +433,6 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
     
-    log_info "Backend service created"
-    
-    # Reload systemd and start services
     systemctl daemon-reload
     systemctl enable streamvault-backend
     systemctl start streamvault-backend
@@ -369,67 +443,55 @@ EOF
 configure_nginx() {
     log_step "Configuring Nginx..."
     
-    # Remove default site
     rm -f /etc/nginx/sites-enabled/default
     
-    # Create StreamVault nginx config
-    cat > /etc/nginx/sites-available/streamvault << EOF
+    cat > /etc/nginx/sites-available/streamvault << 'NGINXEOF'
 server {
     listen 80;
-    server_name $DOMAIN;
+    server_name DOMAIN_PLACEHOLDER;
     
-    # Frontend - serve static files
     location / {
-        root $APP_DIR/frontend/build;
+        root /opt/streamvault/frontend/build;
         index index.html;
-        try_files \$uri \$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
         
-        # Cache static assets
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
             expires 1y;
             add_header Cache-Control "public, immutable";
         }
     }
     
-    # Backend API proxy
     location /api/ {
-        proxy_pass http://127.0.0.1:$BACKEND_PORT/api/;
+        proxy_pass http://127.0.0.1:8001/api/;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
-        
-        # For streaming
         proxy_buffering off;
         proxy_request_buffering off;
     }
     
-    # Increase max body size for uploads
     client_max_body_size 100M;
     
-    # Gzip compression
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
     gzip_proxied any;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
-    gzip_disable "MSIE [1-6]\.";
 }
-EOF
+NGINXEOF
     
-    # Enable site
+    sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" /etc/nginx/sites-available/streamvault
+    
     ln -sf /etc/nginx/sites-available/streamvault /etc/nginx/sites-enabled/
     
-    # Test nginx config
     nginx -t
-    
-    # Reload nginx
     systemctl reload nginx
     
     log_info "Nginx configured"
@@ -438,11 +500,9 @@ EOF
 configure_firewall() {
     log_step "Configuring firewall..."
     
-    ufw allow 22/tcp    # SSH
-    ufw allow 80/tcp    # HTTP
-    ufw allow 443/tcp   # HTTPS
-    
-    # Enable firewall if not already enabled
+    ufw allow 22/tcp
+    ufw allow 80/tcp
+    ufw allow 443/tcp
     echo "y" | ufw enable || true
     
     log_info "Firewall configured"
@@ -467,36 +527,32 @@ print_completion() {
     echo
     echo -e "${BLUE}Admin credentials:${NC}"
     echo "  Username: $ADMIN_USERNAME"
-    echo "  Password: (the password you entered)"
+    echo "  Password: (the password you specified)"
     echo
     echo -e "${BLUE}Service management:${NC}"
     echo "  sudo systemctl status streamvault-backend"
     echo "  sudo systemctl restart streamvault-backend"
-    echo "  sudo systemctl stop streamvault-backend"
     echo
-    echo -e "${BLUE}Log files:${NC}"
-    echo "  Backend: sudo journalctl -u streamvault-backend -f"
-    echo "  Nginx: /var/log/nginx/access.log"
+    echo -e "${BLUE}Logs:${NC}"
+    echo "  sudo journalctl -u streamvault-backend -f"
     echo
-    echo -e "${BLUE}Application files:${NC}"
-    echo "  Directory: $APP_DIR"
-    echo "  Backend config: $APP_DIR/backend/.env"
-    echo "  Frontend config: $APP_DIR/frontend/.env"
-    echo
-    echo -e "${YELLOW}Note: For HTTPS, consider using Let's Encrypt:${NC}"
+    echo -e "${YELLOW}For HTTPS:${NC}"
     echo "  sudo apt install certbot python3-certbot-nginx"
     echo "  sudo certbot --nginx -d $DOMAIN"
     echo
 }
 
 #===============================================================================
-# Main Installation
+# Main
 #===============================================================================
 
 main() {
     print_banner
     check_root
+    parse_args "$@"
+    check_source_files
     get_user_input
+    validate_config
     
     log_step "Starting installation..."
     
@@ -515,5 +571,4 @@ main() {
     print_completion
 }
 
-# Run main function
 main "$@"

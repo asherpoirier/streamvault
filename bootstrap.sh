@@ -3,39 +3,33 @@
 #===============================================================================
 # StreamVault - One-Line Installer Bootstrap
 # 
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/streamvault/main/bootstrap.sh | sudo bash
+# Usage (interactive):
+#   curl -fsSL https://raw.githubusercontent.com/asherpoirier/streamvault/main/bootstrap.sh -o bootstrap.sh && sudo bash bootstrap.sh
 #
-# Or with wget:
-#   wget -qO- https://raw.githubusercontent.com/YOUR_USERNAME/streamvault/main/bootstrap.sh | sudo bash
+# Usage (non-interactive):
+#   curl -fsSL https://raw.githubusercontent.com/asherpoirier/streamvault/main/bootstrap.sh | sudo bash -s -- --domain example.com --admin-user admin --admin-pass MyPassword123
 #===============================================================================
 
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
 REPO_URL="https://github.com/asherpoirier/streamvault.git"
 INSTALL_DIR="/tmp/streamvault-install"
 
-echo -e "${BLUE}"
+echo ""
 echo "╔═══════════════════════════════════════════════════════════════╗"
 echo "║   StreamVault - One-Line Installer                            ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+echo ""
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
-    echo -e "${RED}[ERROR]${NC} This script must be run as root (use sudo)"
+    echo "[ERROR] This script must be run as root (use sudo)"
     exit 1
 fi
 
 # Install git if not present
 if ! command -v git &> /dev/null; then
-    echo -e "${GREEN}[INFO]${NC} Installing git..."
+    echo "[INFO] Installing git..."
     apt-get update
     apt-get install -y git
 fi
@@ -44,17 +38,17 @@ fi
 rm -rf "$INSTALL_DIR"
 
 # Clone the repository
-echo -e "${GREEN}[INFO]${NC} Downloading StreamVault..."
+echo "[INFO] Downloading StreamVault..."
 git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
 
-# Run the installer
-echo -e "${GREEN}[INFO]${NC} Starting installation..."
+# Run the installer with any passed arguments
+echo "[INFO] Starting installation..."
 cd "$INSTALL_DIR"
 chmod +x install.sh
-./install.sh
+./install.sh "$@"
 
 # Cleanup
-echo -e "${GREEN}[INFO]${NC} Cleaning up temporary files..."
+echo "[INFO] Cleaning up temporary files..."
 rm -rf "$INSTALL_DIR"
 
-echo -e "${GREEN}[INFO]${NC} Bootstrap complete!"
+echo "[INFO] Bootstrap complete!"
