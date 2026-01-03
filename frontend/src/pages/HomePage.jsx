@@ -219,207 +219,120 @@ export default function HomePage() {
     if (!playerOpen || !currentChannel) return;
     
     const originalUrl = currentChannel.url;
-
-    // Cleanup previous instances
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-    if (mpegtsRef.current) {
-      mpegtsRef.current.destroy();
-      mpegtsRef.current = null;
-    }
-
-    // Check file type - be more flexible with detection
-    const urlLower = originalUrl.toLowerCase();
-    const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist') || urlLower.includes('hls');
-    const hasExtension = /\.[a-z0-9]{2,4}(\?|$)/i.test(originalUrl);
-    const isTS = urlLower.endsWith('.ts') || urlLower.includes('.ts?');
-    // If no recognized extension, assume it's MPEG-TS (most common for IPTV streams)
-    const assumeTS = !isHLS && !hasExtension;
     
-    // Need video ref for playable formats
-    const video = videoRef.current;
-    if (!video) return;
+    // Cleanup previous player
+    if (playerRef.current) {
+      playerRef.current.dispose();
+      playerRef.current = null;
+    }
+
+    // Need video element
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
 
     setPlayerLoading(true);
     setPlayerError(null);
     
-    // Proxy URL for the stream - include token as query param for mpegts.js
+    // Determine stream type
+    const urlLower = originalUrl.toLowerCase();
+    const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist') || urlLower.includes('hls');
+    
+    // Build proxy URL
     const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}&token=${encodeURIComponent(token)}`;
     
-    if ((isTS || assumeTS) && !isHLS) {
-      // Use mpegts.js for MPEG-TS streams (including extensionless URLs)
-      console.log("Using mpegts.js for stream:", originalUrl);
-      if (mpegts.isSupported()) {
-        const player = mpegts.createPlayer({
-          type: 'mpegts',
-          isLive: true,
-          url: proxyUrl,
-        }, {
-          enableWorker: true,
-          lazyLoadMaxDuration: 3 * 60,
-          seekType: 'range',
-          liveBufferLatencyChasing: true,
-          liveSync: true,
-        });
-        
-        mpegtsRef.current = player;
-        player.attachMediaElement(video);
-        player.load();
-        
-        // Track if we've received data
-        let hasReceivedData = false;
-        
-        player.on(mpegts.Events.LOADING_COMPLETE, () => {
-          console.log("MPEGTS: Loading complete");
-          setPlayerLoading(false);
-        });
-        
-        player.on(mpegts.Events.METADATA_ARRIVED, () => {
-          console.log("MPEGTS: Metadata arrived");
-          hasReceivedData = true;
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
-        });
-        
-        player.on(mpegts.Events.MEDIA_INFO, (info) => {
-          console.log("MPEGTS: Media info received", info);
-          hasReceivedData = true;
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
-        });
-        
-        player.on(mpegts.Events.STATISTICS_INFO, (stats) => {
-          if (!hasReceivedData && stats.totalReceive > 0) {
-            console.log("MPEGTS: Receiving data, bytes:", stats.totalReceive);
-            hasReceivedData = true;
-            setPlayerLoading(false);
-            // Try to play after receiving data
-            setTimeout(() => {
-              video.play().catch(e => console.log("Autoplay prevented:", e));
-            }, 500);
-          }
-        });
-        
-        player.on(mpegts.Events.ERROR, (errorType, errorDetail, errorInfo) => {
-          console.error("MPEGTS Error:", errorType, errorDetail, errorInfo);
-          setPlayerLoading(false);
-          if (errorDetail && errorDetail.includes && errorDetail.includes('403')) {
-            setPlayerError("Stream access denied - the provider has IP restrictions. Try copying the URL and playing in VLC on your computer.");
-          } else {
-            setPlayerError("Failed to load stream. The stream may be offline, IP-restricted, or unavailable.");
-          }
-        });
-        
-        // Try to play after a short delay regardless
-        setTimeout(() => {
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
-        }, 3000);
-        
-        // Show timeout error after 20 seconds if still loading
-        setTimeout(() => {
-          if (playerLoading) {
-            setPlayerLoading(false);
-            setPlayerError("Stream is taking too long to load. This stream may not be compatible with browser playback. Try copying the URL and playing in VLC.");
-          }
-        }, 20000);
-        
-      } else {
-        setPlayerLoading(false);
-        setPlayerError("Your browser doesn't support MPEG-TS playback. Please copy the URL and use VLC.");
-      }
-    } else if (isHLS) {
-      // HLS stream - use proxy with URL rewriting
-      const apiBase = encodeURIComponent(API);
-      const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}&token=${encodeURIComponent(token)}`;
-      
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          xhrSetup: function(xhr, url) {
-            // Add auth header for proxy requests
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          },
-        });
-        hlsRef.current = hls;
-
-        hls.loadSource(hlsProxyUrl);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
-        });
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error("HLS Error:", data);
-          if (data.fatal) {
-            setPlayerLoading(false);
-            setPlayerError("Failed to load HLS stream. The stream may be offline.");
-          }
-        });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = hlsProxyUrl;
-        video.addEventListener('loadedmetadata', () => {
-          setPlayerLoading(false);
-          video.play().catch(e => console.log("Autoplay prevented:", e));
-        });
-        video.addEventListener('error', () => {
-          setPlayerLoading(false);
-          setPlayerError("Failed to load stream.");
-        });
-      }
-    } else {
-      // Other formats (mp4, etc) - try to play directly via proxy
-      const fetchWithAuth = async () => {
-        try {
-          const response = await fetch(proxyUrl, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error('Stream fetch failed');
-          }
-          
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          video.src = blobUrl;
-          
-          video.onloadedmetadata = () => {
-            setPlayerLoading(false);
-            video.play().catch(e => console.log("Autoplay prevented:", e));
-          };
-          
-          video.onerror = () => {
-            setPlayerLoading(false);
-            setPlayerError("Failed to play stream. Format may not be supported in browser.");
-          };
-          
-        } catch (error) {
-          console.error("Fetch error:", error);
-          setPlayerLoading(false);
-          setPlayerError("Failed to load stream. The stream may be offline.");
-        }
-      };
-      
-      fetchWithAuth();
+    // For HLS, use the m3u8 proxy that rewrites URLs
+    const apiBase = encodeURIComponent(API);
+    const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}&token=${encodeURIComponent(token)}`;
+    
+    // Determine the source URL and type
+    let sourceUrl = proxyUrl;
+    let sourceType = 'video/mp2t'; // Default to MPEG-TS
+    
+    if (isHLS) {
+      sourceUrl = hlsProxyUrl;
+      sourceType = 'application/x-mpegURL';
+    } else if (urlLower.includes('.mp4')) {
+      sourceType = 'video/mp4';
     }
-
-    // Timeout for streams that hang
-    const timeout = setTimeout(() => {
+    
+    console.log("Video.js playing:", originalUrl, "Type:", sourceType);
+    
+    // Initialize video.js player
+    const player = videojs(videoElement, {
+      autoplay: true,
+      controls: true,
+      responsive: true,
+      fluid: true,
+      liveui: true,
+      html5: {
+        vhs: {
+          overrideNative: true,
+          enableLowInitialPlaylist: true,
+          smoothQualityChange: true,
+          handleManifestRedirects: true,
+        },
+        nativeAudioTracks: false,
+        nativeVideoTracks: false,
+      },
+      sources: [{
+        src: sourceUrl,
+        type: sourceType,
+      }],
+    });
+    
+    playerRef.current = player;
+    
+    // Event handlers
+    player.on('loadedmetadata', () => {
+      console.log("Video.js: Metadata loaded");
+      setPlayerLoading(false);
+    });
+    
+    player.on('playing', () => {
+      console.log("Video.js: Playing");
+      setPlayerLoading(false);
+    });
+    
+    player.on('waiting', () => {
+      console.log("Video.js: Buffering...");
+    });
+    
+    player.on('error', () => {
+      const error = player.error();
+      console.error("Video.js Error:", error);
+      setPlayerLoading(false);
+      
+      if (error) {
+        if (error.code === 2) {
+          setPlayerError("Network error. The stream may be unavailable or blocked.");
+        } else if (error.code === 3) {
+          setPlayerError("Media decoding error. This stream format may not be supported in your browser. Try copying the URL and using VLC.");
+        } else if (error.code === 4) {
+          setPlayerError("Stream format not supported. Try copying the URL and using VLC.");
+        } else {
+          setPlayerError("Failed to load stream. Try copying the URL and using VLC.");
+        }
+      }
+    });
+    
+    // Force loading state off after timeout
+    const loadTimeout = setTimeout(() => {
+      setPlayerLoading(false);
+    }, 5000);
+    
+    // Error timeout - if nothing plays after 20 seconds
+    const errorTimeout = setTimeout(() => {
       if (playerLoading) {
         setPlayerLoading(false);
-        setPlayerError("Stream is taking too long to load. It may be offline or unavailable.");
+        setPlayerError("Stream is taking too long to load. Try copying the URL and using VLC.");
       }
     }, 20000);
 
-    return () => clearTimeout(timeout);
-  }, [playerOpen, currentChannel, token]);
+    return () => {
+      clearTimeout(loadTimeout);
+      clearTimeout(errorTimeout);
+    };
+  }, [playerOpen, currentChannel, token, playerLoading]);
 
   const toggleMute = () => {
     if (videoRef.current) {
