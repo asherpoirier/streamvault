@@ -178,6 +178,10 @@ export default function HomePage() {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    if (mpegtsRef.current) {
+      mpegtsRef.current.destroy();
+      mpegtsRef.current = null;
+    }
     setPlayerOpen(false);
     setCurrentChannel(null);
     setPlayerError(null);
