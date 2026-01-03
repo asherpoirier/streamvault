@@ -263,28 +263,22 @@ export default function HomePage() {
       console.log("Video.js playing:", originalUrl, "Type:", sourceType, "URL:", sourceUrl);
       
       try {
-        // Initialize video.js player
+        // Initialize video.js player with simpler config
         const player = videojs(videoElement, {
           autoplay: true,
           controls: true,
           responsive: true,
           fluid: true,
-          liveui: true,
           preload: 'auto',
+          techOrder: ['html5'],
           html5: {
-            vhs: {
-              overrideNative: true,
-              enableLowInitialPlaylist: true,
-              smoothQualityChange: true,
-              handleManifestRedirects: true,
+            hls: {
+              withCredentials: false,
             },
-            nativeAudioTracks: false,
-            nativeVideoTracks: false,
+            nativeVideoTracks: true,
+            nativeAudioTracks: true,
+            nativeTextTracks: true,
           },
-          sources: [{
-            src: sourceUrl,
-            type: sourceType,
-          }],
         });
         
         playerRef.current = player;
