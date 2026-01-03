@@ -220,113 +220,128 @@ export default function HomePage() {
     
     const originalUrl = currentChannel.url;
     
-    // Cleanup previous player
-    if (playerRef.current) {
-      playerRef.current.dispose();
-      playerRef.current = null;
-    }
+    // Use a small delay to ensure the video element is mounted in the DOM
+    const initTimer = setTimeout(() => {
+      // Cleanup previous player
+      if (playerRef.current) {
+        playerRef.current.dispose();
+        playerRef.current = null;
+      }
 
-    // Need video element
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
+      // Need video element
+      const videoElement = videoRef.current;
+      if (!videoElement) {
+        console.error("Video element not found");
+        return;
+      }
 
-    setPlayerLoading(true);
-    setPlayerError(null);
-    
-    // Determine stream type
-    const urlLower = originalUrl.toLowerCase();
-    const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist') || urlLower.includes('hls');
-    
-    // Build proxy URL
-    const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}&token=${encodeURIComponent(token)}`;
-    
-    // For HLS, use the m3u8 proxy that rewrites URLs
-    const apiBase = encodeURIComponent(API);
-    const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}&token=${encodeURIComponent(token)}`;
-    
-    // Determine the source URL and type
-    let sourceUrl = proxyUrl;
-    let sourceType = 'video/mp2t'; // Default to MPEG-TS
-    
-    if (isHLS) {
-      sourceUrl = hlsProxyUrl;
-      sourceType = 'application/x-mpegURL';
-    } else if (urlLower.includes('.mp4')) {
-      sourceType = 'video/mp4';
-    }
-    
-    console.log("Video.js playing:", originalUrl, "Type:", sourceType);
-    
-    // Initialize video.js player
-    const player = videojs(videoElement, {
-      autoplay: true,
-      controls: true,
-      responsive: true,
-      fluid: true,
-      liveui: true,
-      html5: {
-        vhs: {
-          overrideNative: true,
-          enableLowInitialPlaylist: true,
-          smoothQualityChange: true,
-          handleManifestRedirects: true,
-        },
-        nativeAudioTracks: false,
-        nativeVideoTracks: false,
-      },
-      sources: [{
-        src: sourceUrl,
-        type: sourceType,
-      }],
-    });
-    
-    playerRef.current = player;
-    
-    // Event handlers
-    player.on('loadedmetadata', () => {
-      console.log("Video.js: Metadata loaded");
-      setPlayerLoading(false);
-    });
-    
-    player.on('playing', () => {
-      console.log("Video.js: Playing");
-      setPlayerLoading(false);
-    });
-    
-    player.on('waiting', () => {
-      console.log("Video.js: Buffering...");
-    });
-    
-    player.on('error', () => {
-      const error = player.error();
-      console.error("Video.js Error:", error);
-      setPlayerLoading(false);
+      setPlayerLoading(true);
+      setPlayerError(null);
       
-      if (error) {
-        if (error.code === 2) {
-          setPlayerError("Network error. The stream may be unavailable or blocked.");
-        } else if (error.code === 3) {
-          setPlayerError("Media decoding error. This stream format may not be supported in your browser. Try copying the URL and using VLC.");
-        } else if (error.code === 4) {
-          setPlayerError("Stream format not supported. Try copying the URL and using VLC.");
-        } else {
-          setPlayerError("Failed to load stream. Try copying the URL and using VLC.");
-        }
+      // Determine stream type
+      const urlLower = originalUrl.toLowerCase();
+      const isHLS = urlLower.includes('.m3u8') || urlLower.includes('.m3u') || urlLower.includes('/playlist') || urlLower.includes('hls');
+      
+      // Build proxy URL
+      const proxyUrl = `${API}/proxy/stream?url=${encodeURIComponent(originalUrl)}&token=${encodeURIComponent(token)}`;
+      
+      // For HLS, use the m3u8 proxy that rewrites URLs
+      const apiBase = encodeURIComponent(API);
+      const hlsProxyUrl = `${API}/proxy/m3u8?url=${encodeURIComponent(originalUrl)}&api_base=${apiBase}&token=${encodeURIComponent(token)}`;
+      
+      // Determine the source URL and type
+      let sourceUrl = proxyUrl;
+      let sourceType = 'video/mp2t'; // Default to MPEG-TS
+      
+      if (isHLS) {
+        sourceUrl = hlsProxyUrl;
+        sourceType = 'application/x-mpegURL';
+      } else if (urlLower.includes('.mp4')) {
+        sourceType = 'video/mp4';
       }
-    });
-    
-    // Force loading state off after timeout
-    const loadTimeout = setTimeout(() => {
-      setPlayerLoading(false);
-    }, 5000);
-    
-    // Error timeout - if nothing plays after 20 seconds
-    const errorTimeout = setTimeout(() => {
-      if (playerLoading) {
+      
+      console.log("Video.js playing:", originalUrl, "Type:", sourceType, "URL:", sourceUrl);
+      
+      try {
+        // Initialize video.js player
+        const player = videojs(videoElement, {
+          autoplay: true,
+          controls: true,
+          responsive: true,
+          fluid: true,
+          liveui: true,
+          preload: 'auto',
+          html5: {
+            vhs: {
+              overrideNative: true,
+              enableLowInitialPlaylist: true,
+              smoothQualityChange: true,
+              handleManifestRedirects: true,
+            },
+            nativeAudioTracks: false,
+            nativeVideoTracks: false,
+          },
+          sources: [{
+            src: sourceUrl,
+            type: sourceType,
+          }],
+        });
+        
+        playerRef.current = player;
+        
+        // Event handlers
+        player.on('loadedmetadata', () => {
+          console.log("Video.js: Metadata loaded");
+          setPlayerLoading(false);
+        });
+        
+        player.on('loadeddata', () => {
+          console.log("Video.js: Data loaded");
+          setPlayerLoading(false);
+        });
+        
+        player.on('playing', () => {
+          console.log("Video.js: Playing");
+          setPlayerLoading(false);
+        });
+        
+        player.on('canplay', () => {
+          console.log("Video.js: Can play");
+          setPlayerLoading(false);
+          player.play().catch(e => console.log("Autoplay prevented:", e));
+        });
+        
+        player.on('waiting', () => {
+          console.log("Video.js: Buffering...");
+        });
+        
+        player.on('error', () => {
+          const error = player.error();
+          console.error("Video.js Error:", error);
+          setPlayerLoading(false);
+          
+          if (error) {
+            if (error.code === 2) {
+              setPlayerError("Network error. The stream may be unavailable or blocked.");
+            } else if (error.code === 3) {
+              setPlayerError("Media decoding error. This stream format may not be supported in your browser. Try copying the URL and using VLC.");
+            } else if (error.code === 4) {
+              setPlayerError("Stream format not supported. Try copying the URL and using VLC.");
+            } else {
+              setPlayerError("Failed to load stream. Try copying the URL and using VLC.");
+            }
+          }
+        });
+        
+        // Start loading the source
+        player.src({ src: sourceUrl, type: sourceType });
+        
+      } catch (err) {
+        console.error("Video.js init error:", err);
         setPlayerLoading(false);
-        setPlayerError("Stream is taking too long to load. Try copying the URL and using VLC.");
+        setPlayerError("Failed to initialize video player.");
       }
-    }, 20000);
+    }, 100); // Small delay to ensure DOM is ready
 
     return () => {
       clearTimeout(loadTimeout);
