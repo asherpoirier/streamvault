@@ -424,6 +424,7 @@ async def proxy_m3u8_options():
 
 @api_router.get("/proxy/stream")
 async def proxy_stream(
+    request: Request,
     url: str = Query(..., description="Stream URL to proxy"),
     token: Optional[str] = Query(None, description="Auth token")
 ):
@@ -436,14 +437,22 @@ async def proxy_stream(
             raise HTTPException(status_code=401, detail="Invalid token")
     
     try:
+        # Get Range header if present
+        range_header = request.headers.get('Range', None)
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
+        }
+        
+        if range_header:
+            headers["Range"] = range_header
+        
         async def stream_generator():
             async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
-                async with client.stream("GET", url, headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "*/*",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Connection": "keep-alive",
-                }) as response:
+                async with client.stream("GET", url, headers=headers) as response:
                     async for chunk in response.aiter_bytes(chunk_size=65536):
                         yield chunk
         
